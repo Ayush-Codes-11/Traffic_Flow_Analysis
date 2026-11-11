@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    { "id": "not_a_number", "name": "BadNode",  "x": 0.0, "y": 0.0 },
+    { "id": 1,              "name": "GoodNode", "x": 1.0, "y": 1.0 }
+  ],
+  "edges": [
+    { "from": 0, "to": 1, "length": 2.0, "capacity": "BAD_VALUE", "free_flow_time": 3.0 },
+    { "from": 1, "to": 2, "length": 1.5, "capacity": 1000.0,      "free_flow_time": 2.0 }
+  ]
+}
