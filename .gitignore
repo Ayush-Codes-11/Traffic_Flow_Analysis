@@ -1,0 +1,27 @@
+# Build outputs
+*.exe
+*.o
+*.out
+*.obj
+
+# CMake / build dirs
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+
+# IDE files
+.vscode/
+.vs/
+*.suo
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# macOS
+.DS_Store
