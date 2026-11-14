@@ -9,8 +9,8 @@
 CXX      = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
-# Source files (Phase 1 + 2)
-SRCS = src/graph.cpp src/dijkstra.cpp src/astar.cpp src/main.cpp
+# Source files (Phase 1 + 2 + 3)
+SRCS = src/graph.cpp src/dijkstra.cpp src/astar.cpp src/simulation.cpp src/main.cpp
 
 # Output binary
 TARGET = traffic_sim.exe

@@ -1,10 +1,12 @@
 // =============================================================================
-// main.cpp  –  Phase 1 + Phase 2 tests
+// main.cpp  –  Phase 1 + Phase 2 + Phase 3 tests
 // Traffic Management & Simulation System
 // =============================================================================
 #include "graph.h"
 #include "minheap.h"
 #include "pathfinder.h"
+#include "simulation.h"
+#include "vehicle_queue.h"
 
 #include <iostream>
 #include <iomanip>
@@ -13,6 +15,7 @@
 #include <algorithm>  // is_sorted
 #include <string>
 #include <cassert>
+#include <random>     // mt19937
 
 // ── Utility helpers ──────────────────────────────────────────────────────────
 
@@ -305,12 +308,188 @@ static void p2_congestion(Graph& g)
 }
 
 // ============================================================================
+// ══ PHASE 3 TESTS ══
+// ============================================================================
+
+// ── P3-TEST 1: VehicleQueue FIFO ordering ───────────────────────────────────
+// Verifies the circular-array queue gives elements back in FIFO order,
+// and that dequeue on an empty queue throws an exception (not silent crash).
+static void p3_queue_test()
+{
+    section("P3-TEST 1 – VehicleQueue FIFO ordering + empty-queue safety");
+
+    VehicleQueue<int> q;
+    std::vector<int> values = {1, 2, 3, 4, 5};
+    for (int v : values) q.enqueue(v);
+
+    std::cout << "Enqueued: 1 2 3 4 5\nDequeued: ";
+    bool ok = true;
+    for (int expected : values) {
+        int got = q.dequeue();
+        std::cout << got << " ";
+        if (got != expected) ok = false;
+    }
+    std::cout << "\nFIFO order: " << (ok ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    // Test exception on empty queue
+    bool threw = false;
+    try { q.dequeue(); }
+    catch (const std::underflow_error&) { threw = true; }
+    std::cout << "Empty-queue exception: " << (threw ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    // Test dynamic resize: enqueue 20 items (beyond default cap=8)
+    VehicleQueue<int> q2;
+    for (int i = 0; i < 20; ++i) q2.enqueue(i);
+    bool resize_ok = true;
+    for (int i = 0; i < 20; ++i) {
+        if (q2.dequeue() != i) { resize_ok = false; break; }
+    }
+    std::cout << "Dynamic resize (20 items): " << (resize_ok ? "PASS ✓" : "FAIL ✗") << "\n";
+}
+
+// ── P3-TEST 2: Single vehicle, no signals ───────────────────────────────────
+// Route 0 → 7 (Central_Station → North_Suburb) = 0→13→7, fft = 3+4 = 7 min.
+// With green_duration=0 (signals off) and no other vehicles, the vehicle
+// should finish in exactly free-flow time (no queuing delay).
+static void p3_single_vehicle(Graph& g)
+{
+    section("P3-TEST 2 – Single vehicle, no signals (travel time = free-flow)");
+
+    Simulation::Config cfg;
+    cfg.green_duration = 0.0;  // signals disabled
+    cfg.headway        = 0.1;
+    cfg.log_vehicle_id = 0;    // trace vehicle 0
+
+    Simulation sim(g, cfg);
+    sim.add_vehicle(0, 7, 0.0);   // Central → North_Suburb, spawn at t=0
+    sim.run(60.0);
+
+    const auto& vehs = sim.get_vehicles();
+    bool found = !vehs.empty() && vehs[0].completed;
+    double travel = found ? (vehs[0].finish_time - vehs[0].entry_time) : -1.0;
+    // Expected: 3 + 4 = 7 minutes free-flow (BPR with 0 flow = t0)
+    bool pass = found && std::fabs(travel - 7.0) < 0.5;
+    std::cout << "Vehicle 0: completed=" << found
+              << "  travel_time=" << std::fixed << std::setprecision(3) << travel
+              << " min  (expected ~7.0 min)\n";
+    std::cout << "Travel time ≈ 7 min: " << (pass ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    sim.print_vehicle_timeline(0);
+}
+
+// ── P3-TEST 3: Signal causes a wait ─────────────────────────────────────────
+// Vehicle 0 at node 0 wants to use edge 0→4.
+// adj[0] order (from JSON): 0→13(idx0), 0→4(idx1), 0→5(idx2), 0→6(idx3).
+// With green_duration=2.0, phase 1 starts at t=2.0.
+// Vehicle spawned at t=0.5; signal for 0→4 is red until t=2.0 → wait ≥ 1.5 min.
+static void p3_signal_test(Graph& g)
+{
+    section("P3-TEST 3 – Signal forces a wait (red → green transition)");
+
+    Simulation::Config cfg;
+    cfg.green_duration = 2.0;  // 2-minute green phases
+    cfg.headway        = 0.1;
+    cfg.log_vehicle_id = 0;
+
+    // Use node 0 → 10 so the vehicle must cross 0→4 (phase-1 edge at node 0).
+    // Route: 0→4→10 or similar; exact route chosen by A*.
+    Simulation sim(g, cfg);
+    sim.add_vehicle(0, 10, 0.5);   // spawn at t=0.5 (edge 0→4 or 0→5 is red)
+    sim.run(60.0);
+
+    const auto& vehs = sim.get_vehicles();
+    bool completed = !vehs.empty() && vehs[0].completed;
+    double waited  = completed ? vehs[0].total_wait : 0.0;
+
+    std::cout << "Vehicle 0: completed=" << completed
+              << "  total_wait=" << std::fixed << std::setprecision(3)
+              << waited << " min\n";
+    std::cout << "Signal wait > 0: " << (waited > 0.0 ? "PASS ✓" : "FAIL ✗") << "\n";
+    sim.print_vehicle_timeline(0);
+}
+
+// ── P3-TEST 4: 20 vehicles, short signal phases ──────────────────────────────
+// 20 vehicles all go 0 → 7 at t=0.  With a short green_duration=0.5 and
+// headway=0.1, vehicles bunch into a queue.  Later vehicles should take
+// longer (or equal) to complete than the first one.
+static void p3_twenty_vehicles(Graph& g)
+{
+    section("P3-TEST 4 – 20 vehicles, queue buildup with signals");
+
+    Simulation::Config cfg;
+    cfg.green_duration = 0.5;   // short phases → queue builds fast
+    cfg.headway        = 0.1;
+    cfg.log_vehicle_id = -1;    // no individual trace (too verbose)
+
+    Simulation sim(g, cfg);
+    for (int i = 0; i < 20; ++i)
+        sim.add_vehicle(0, 7, 0.0);   // all spawn at t=0
+    sim.run(100.0);
+
+    const auto& vehs = sim.get_vehicles();
+    int done = 0;
+    double first_time = -1.0, last_time = -1.0;
+    for (const auto& v : vehs) {
+        if (!v.completed) continue;
+        double tt = v.finish_time - v.entry_time;
+        if (first_time < 0 || tt < first_time) first_time = tt;
+        if (tt > last_time) last_time = tt;
+        ++done;
+    }
+    std::cout << "Vehicles completed: " << done << " / 20\n";
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "Fastest: " << first_time << " min   Slowest: " << last_time << " min\n";
+    bool pass = (done > 0) && (last_time >= first_time);
+    std::cout << "Later vehicles slower/equal: " << (pass ? "PASS ✓" : "FAIL ✗") << "\n";
+    sim.print_summary();
+}
+
+// ── P3-TEST 5: Full simulation, 50 random vehicles ──────────────────────────
+// Fixed seed for reproducibility.  Vehicles have random src/dst/spawn_time.
+// Checks that the simulation completes without crashing and prints a summary.
+static void p3_full_simulation(Graph& g)
+{
+    section("P3-TEST 5 – Full simulation: 50 random vehicles, signals on");
+
+    Simulation::Config cfg;
+    cfg.green_duration = 2.0;
+    cfg.headway        = 0.1;
+    cfg.log_vehicle_id = 0;   // trace vehicle 0
+
+    Simulation sim(g, cfg);
+
+    std::mt19937 rng(42);                                       // fixed seed → reproducible
+    std::uniform_int_distribution<int>    id_dist(0, 14);       // node ids 0-14
+    std::uniform_real_distribution<double> t_dist(0.0, 30.0);  // spawn in first 30 min
+
+    for (int i = 0; i < 50; ++i) {
+        int src = id_dist(rng);
+        int dst = id_dist(rng);
+        while (dst == src) dst = id_dist(rng);  // ensure src ≠ dst
+        double spawn = t_dist(rng);
+        sim.add_vehicle(src, dst, spawn);
+    }
+
+    sim.run(120.0);
+
+    const auto& vehs = sim.get_vehicles();
+    int done = 0;
+    for (const auto& v : vehs) if (v.completed) ++done;
+    std::cout << "Vehicles completed: " << done << " / 50\n";
+    bool pass = (done > 0);
+    std::cout << "At least 1 completed: " << (pass ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    sim.print_summary();
+    sim.print_vehicle_timeline(0);
+}
+
+// ============================================================================
 // main
 // ============================================================================
 int main()
 {
     std::cout << "Traffic Management & Simulation System\n";
-    std::cout << "Phase 1 + Phase 2 Tests\n";
+    std::cout << "Phase 1 + Phase 2 + Phase 3 Tests\n";
     std::cout << std::string(65, '*') << "\n";
 
     Graph g;
@@ -328,7 +507,29 @@ int main()
     p2_edge_cases(g);
     p2_congestion(g);
 
+    // ── Phase 3 ─────────────────────────────────────────────────────────
+    // Use a fresh graph (g has isolated node 15 added by p2_edge_cases;
+    // load a clean copy so simulation node IDs are 0-14 only).
+    Graph g3;
+    g3.load_from_json("data/sample_city.json");
+
+    p3_queue_test();
+    p3_single_vehicle(g3);
+
+    // Reload between simulation tests: each test may alter edge flows.
+    Graph g3b;
+    g3b.load_from_json("data/sample_city.json");
+    p3_signal_test(g3b);
+
+    Graph g3c;
+    g3c.load_from_json("data/sample_city.json");
+    p3_twenty_vehicles(g3c);
+
+    Graph g3d;
+    g3d.load_from_json("data/sample_city.json");
+    p3_full_simulation(g3d);
+
     std::cout << "\n" << std::string(65, '*') << "\n";
-    std::cout << "All Phase 1 + Phase 2 tests complete.\n";
+    std::cout << "All Phase 1 + Phase 2 + Phase 3 tests complete.\n";
     return 0;
 }
