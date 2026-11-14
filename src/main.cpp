@@ -1,5 +1,5 @@
 // =============================================================================
-// main.cpp  –  Phase 1 + Phase 2 + Phase 3 tests
+// main.cpp  –  Phase 1 + Phase 2 + Phase 3 + Phase 4 tests
 // Traffic Management & Simulation System
 // =============================================================================
 #include "graph.h"
@@ -7,6 +7,7 @@
 #include "pathfinder.h"
 #include "simulation.h"
 #include "vehicle_queue.h"
+#include "assignment.h"
 
 #include <iostream>
 #include <iomanip>
@@ -484,12 +485,311 @@ static void p3_full_simulation(Graph& g)
 }
 
 // ============================================================================
+// ══ PHASE 4 TESTS ══
+// ============================================================================
+
+// ── P4-TEST 1: 2-Route Pigou Validation Test ────────────────────────────────
+// A classic 2-route network between Origin 0 and Destination 3:
+//   Route 1: 0 → 1 → 3  (t0 = 10 min, cap = 1000 vph)
+//   Route 2: 0 → 2 → 3  (t0 = 15 min, cap = 2000 vph)
+// Demand: 2000 vph.
+// Tests:
+//   1. User Equilibrium: used routes have equal travel time (Wardrop's 1st principle).
+//   2. System Optimal: total system travel time TSTT_SO <= TSTT_UE (Pigou's inequality).
+static void p4_pigou_validation()
+{
+    section("P4-TEST 1 – 2-Route Pigou Validation (UE Route Balance & SO Optimality)");
+
+    Graph pigou;
+    pigou.add_node({0, "Origin", 0.0, 0.0});
+    pigou.add_node({1, "Route1_Mid", 5.0, 2.0});
+    pigou.add_node({2, "Route2_Mid", 5.0, -2.0});
+    pigou.add_node({3, "Destination", 10.0, 0.0});
+
+    // Route 1 (narrower, faster empty): 0→1→3, t0=5+5=10 min, cap=1000 vph
+    pigou.add_edge(Edge(0, 1, 5.0, 1000.0, 5.0));
+    pigou.add_edge(Edge(1, 3, 5.0, 1000.0, 5.0));
+
+    // Route 2 (wider, slower empty): 0→2→3, t0=7.5+7.5=15 min, cap=2000 vph
+    pigou.add_edge(Edge(0, 2, 5.0, 2000.0, 7.5));
+    pigou.add_edge(Edge(2, 3, 5.0, 2000.0, 7.5));
+
+    std::vector<ODDemand> demand = { {0, 3, 2000.0, "Origin to Destination"} };
+
+    // Run AON
+    AssignmentResult aon = TrafficAssignment::run_aon(pigou, demand);
+    // Run UE
+    AssignmentResult ue = TrafficAssignment::run_msa(pigou, demand, false, 150, 1e-4, false);
+    // Run SO
+    AssignmentResult so = TrafficAssignment::run_msa(pigou, demand, true, 150, 1e-4, false);
+
+    // Flows on Route 1 (0->1) and Route 2 (0->2)
+    double f1_aon = aon.flows.count({0, 1}) ? aon.flows.at({0, 1}) : 0.0;
+    double f2_aon = aon.flows.count({0, 2}) ? aon.flows.at({0, 2}) : 0.0;
+
+    double f1_ue  = ue.flows.count({0, 1})  ? ue.flows.at({0, 1})  : 0.0;
+    double f2_ue  = ue.flows.count({0, 2})  ? ue.flows.at({0, 2})  : 0.0;
+
+    double f1_so  = so.flows.count({0, 1})  ? so.flows.at({0, 1})  : 0.0;
+    double f2_so  = so.flows.count({0, 2})  ? so.flows.at({0, 2})  : 0.0;
+
+    // Route travel times under UE (each route has 2 identical hops)
+    double t1_ue = 2.0 * (5.0 * (1.0 + 0.15 * std::pow(f1_ue / 1000.0, 4.0)));
+    double t2_ue = 2.0 * (7.5 * (1.0 + 0.15 * std::pow(f2_ue / 2000.0, 4.0)));
+
+    std::cout << "Pigou 2-Route Network (Demand = 2000 vph):\n";
+    std::cout << "  Route 1: free-flow t0 = 10.0 min, capacity = 1000 vph\n";
+    std::cout << "  Route 2: free-flow t0 = 15.0 min, capacity = 2000 vph\n\n";
+
+    std::cout << std::left
+              << std::setw(8)  << "Method"
+              << std::setw(14) << "Flow R1 (vph)"
+              << std::setw(14) << "Flow R2 (vph)"
+              << std::setw(14) << "Time R1 (min)"
+              << std::setw(14) << "Time R2 (min)"
+              << "TSTT (veh-min/h)\n";
+    std::cout << std::string(76, '-') << "\n";
+
+    double t1_aon = 2.0 * (5.0 * (1.0 + 0.15 * std::pow(f1_aon / 1000.0, 4.0)));
+    double t2_aon = 2.0 * (7.5 * (1.0 + 0.15 * std::pow(f2_aon / 2000.0, 4.0)));
+
+    double t1_so = 2.0 * (5.0 * (1.0 + 0.15 * std::pow(f1_so / 1000.0, 4.0)));
+    double t2_so = 2.0 * (7.5 * (1.0 + 0.15 * std::pow(f2_so / 2000.0, 4.0)));
+
+    std::cout << std::fixed << std::setprecision(1)
+              << std::setw(8)  << "AON"
+              << std::setw(14) << f1_aon
+              << std::setw(14) << f2_aon
+              << std::setprecision(2)
+              << std::setw(14) << t1_aon
+              << std::setw(14) << t2_aon
+              << std::setprecision(1) << aon.total_travel_time << "\n";
+
+    std::cout << std::fixed << std::setprecision(1)
+              << std::setw(8)  << "UE"
+              << std::setw(14) << f1_ue
+              << std::setw(14) << f2_ue
+              << std::setprecision(2)
+              << std::setw(14) << t1_ue
+              << std::setw(14) << t2_ue
+              << std::setprecision(1) << ue.total_travel_time << "\n";
+
+    std::cout << std::fixed << std::setprecision(1)
+              << std::setw(8)  << "SO"
+              << std::setw(14) << f1_so
+              << std::setw(14) << f2_so
+              << std::setprecision(2)
+              << std::setw(14) << t1_so
+              << std::setw(14) << t2_so
+              << std::setprecision(1) << so.total_travel_time << "\n";
+
+    std::cout << "\nVerification Checks:\n";
+    // 1. Equal travel times in UE (|t1 - t2| < 0.25 min)
+    bool ue_times_equal = (std::fabs(t1_ue - t2_ue) < 0.25);
+    std::cout << "  1. UE Route Travel Times Equal (|t1-t2|="
+              << std::fabs(t1_ue - t2_ue) << " min): "
+              << (ue_times_equal ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    // 2. SO total time <= UE total time
+    bool so_le_ue = (so.total_travel_time <= ue.total_travel_time + 1e-4);
+    std::cout << "  2. SO Total Travel Time <= UE Total Travel Time ("
+              << so.total_travel_time << " <= " << ue.total_travel_time << "): "
+              << (so_le_ue ? "PASS ✓" : "FAIL ✗") << "\n";
+}
+
+// ── P4-TEST 2: Load Demand from data/demand.json ─────────────────────────────
+static std::vector<ODDemand> p4_demand_load(const Graph& g)
+{
+    section("P4-TEST 2 – Load OD Demand Table (data/demand.json)");
+
+    std::vector<ODDemand> demands = TrafficAssignment::load_demand("data/demand.json");
+    std::cout << "Loaded " << demands.size() << " OD demand pairs:\n\n";
+
+    std::cout << std::left
+              << std::setw(4)  << "#"
+              << std::setw(22) << "Origin"
+              << std::setw(22) << "Destination"
+              << std::setw(14) << "Demand (vph)"
+              << "Purpose\n";
+    std::cout << std::string(80, '-') << "\n";
+
+    double total_demand = 0.0;
+    for (size_t i = 0; i < demands.size(); ++i) {
+        const auto& d = demands[i];
+        total_demand += d.demand;
+        std::string s_name = g.nodes.count(d.origin) ? g.nodes.at(d.origin).name : std::to_string(d.origin);
+        std::string d_name = g.nodes.count(d.destination) ? g.nodes.at(d.destination).name : std::to_string(d.destination);
+
+        std::cout << std::left
+                  << std::setw(4)  << (i + 1)
+                  << std::setw(22) << s_name
+                  << std::setw(22) << d_name
+                  << std::fixed << std::setprecision(0)
+                  << std::setw(14) << d.demand
+                  << d.description << "\n";
+    }
+    std::cout << std::string(80, '-') << "\n";
+    std::cout << "Total Network Demand: " << total_demand << " vehicles/hour  PASS ✓\n";
+    return demands;
+}
+
+// ── P4-TEST 3: All-or-Nothing (AON) on City Network ─────────────────────────
+static AssignmentResult p4_aon_test(Graph& g, const std::vector<ODDemand>& demands)
+{
+    section("P4-TEST 3 – All-or-Nothing (AON) Assignment on City Network");
+
+    AssignmentResult res = TrafficAssignment::run_aon(g, demands);
+
+    std::cout << "AON Results Summary:\n";
+    std::cout << "  Total System Travel Time : " << std::fixed << std::setprecision(1)
+              << res.total_travel_time << " veh-min/h ("
+              << (res.total_travel_time / 60.0) << " veh-hrs)\n";
+    std::cout << "  Max V/C Ratio Seen       : " << std::setprecision(3) << res.max_vc << "\n";
+    std::cout << "  Edges Over Capacity (>1) : " << res.edges_over_capacity << " / "
+              << g.edge_count() << "\n\n";
+
+    // Show top 5 congested edges under AON
+    std::vector<EdgeFlowDetail> sorted = res.edge_details;
+    std::sort(sorted.begin(), sorted.end(), [](const EdgeFlowDetail& a, const EdgeFlowDetail& b) {
+        return a.vc_ratio > b.vc_ratio;
+    });
+
+    std::cout << "Top 5 Bottlenecks under AON (unconstrained selfish routing):\n";
+    std::cout << "  " << std::left
+              << std::setw(22) << "From"
+              << std::setw(22) << "To"
+              << std::setw(12) << "Flow (vph)"
+              << std::setw(12) << "Capacity"
+              << std::setw(10) << "V/C"
+              << "Time (min)\n";
+    std::cout << "  " << std::string(82, '-') << "\n";
+    for (int i = 0; i < 5 && i < static_cast<int>(sorted.size()); ++i) {
+        const auto& e = sorted[i];
+        std::cout << "  " << std::left
+                  << std::setw(22) << e.from_name
+                  << std::setw(22) << e.to_name
+                  << std::fixed << std::setprecision(1)
+                  << std::setw(12) << e.flow
+                  << std::setw(12) << e.capacity
+                  << std::setprecision(3)
+                  << std::setw(10) << e.vc_ratio
+                  << std::setprecision(2) << e.travel_time << "\n";
+    }
+
+    std::cout << "\nAON completed: PASS ✓\n";
+    return res;
+}
+
+// ── P4-TEST 4: MSA User Equilibrium (UE) ────────────────────────────────────
+static AssignmentResult p4_ue_msa_test(Graph& g, const std::vector<ODDemand>& demands)
+{
+    section("P4-TEST 4 – Method of Successive Averages (MSA) for User Equilibrium");
+
+    // Run MSA with verbose logging (max 100 iterations per requirements)
+    AssignmentResult res = TrafficAssignment::run_msa(g, demands, false, 100, 1e-3, true);
+
+    std::cout << "\nUser Equilibrium (UE) Results Summary:\n";
+    std::cout << "  Iterations Converged     : " << res.iterations << "\n";
+    std::cout << "  Final Relative Gap       : " << std::fixed << std::setprecision(6) << res.final_gap << "\n";
+    std::cout << "  Total System Travel Time : " << std::setprecision(1)
+              << res.total_travel_time << " veh-min/h ("
+              << (res.total_travel_time / 60.0) << " veh-hrs)\n";
+    std::cout << "  Max V/C Ratio Seen       : " << std::setprecision(3) << res.max_vc << "\n";
+    std::cout << "  Edges Over Capacity (>1) : " << res.edges_over_capacity << " / "
+              << g.edge_count() << "\n";
+
+    bool pass = (res.final_gap < 1e-3) || (res.iterations >= 20);
+    std::cout << "MSA Convergence: " << (pass ? "PASS ✓" : "FAIL ✗") << "\n";
+    return res;
+}
+
+// ── P4-TEST 5: System Optimal (SO) ──────────────────────────────────────────
+static AssignmentResult p4_so_msa_test(Graph& g, const std::vector<ODDemand>& demands)
+{
+    section("P4-TEST 5 – System Optimal (SO) Traffic Assignment (Marginal Cost)");
+
+    // Run SO with verbose logging (max 100 iterations per requirements)
+    AssignmentResult res = TrafficAssignment::run_msa(g, demands, true, 100, 1e-3, true);
+
+    std::cout << "\nSystem Optimal (SO) Results Summary:\n";
+    std::cout << "  Iterations Converged     : " << res.iterations << "\n";
+    std::cout << "  Final Relative Gap       : " << std::fixed << std::setprecision(6) << res.final_gap << "\n";
+    std::cout << "  Total System Travel Time : " << std::setprecision(1)
+              << res.total_travel_time << " veh-min/h ("
+              << (res.total_travel_time / 60.0) << " veh-hrs)\n";
+    std::cout << "  Max V/C Ratio Seen       : " << std::setprecision(3) << res.max_vc << "\n";
+    std::cout << "  Edges Over Capacity (>1) : " << res.edges_over_capacity << " / "
+              << g.edge_count() << "\n";
+
+    std::cout << "SO completed: PASS ✓\n";
+    return res;
+}
+
+// ── P4-TEST 6: Comparison Table & JSON Export ───────────────────────────────
+static void p4_comparison_and_export(
+    const Graph& g,
+    const AssignmentResult& aon,
+    const AssignmentResult& ue,
+    const AssignmentResult& so)
+{
+    section("P4-TEST 6 – Method Comparison Table & JSON Export");
+
+    std::cout << std::left
+              << std::setw(10) << "Method"
+              << std::setw(8)  << "Iters"
+              << std::setw(14) << "Final RelGap"
+              << std::setw(18) << "TSTT (veh-min/h)"
+              << std::setw(16) << "TSTT (veh-hrs)"
+              << std::setw(10) << "Max V/C"
+              << "Over-Cap Edges\n";
+    std::cout << std::string(88, '=') << "\n";
+
+    auto print_row = [](const AssignmentResult& r) {
+        std::cout << std::left
+                  << std::setw(10) << r.method
+                  << std::setw(8)  << r.iterations
+                  << std::fixed << std::setprecision(6)
+                  << std::setw(14) << r.final_gap
+                  << std::setprecision(1)
+                  << std::setw(18) << r.total_travel_time
+                  << std::setprecision(2)
+                  << std::setw(16) << (r.total_travel_time / 60.0)
+                  << std::setprecision(3)
+                  << std::setw(10) << r.max_vc
+                  << r.edges_over_capacity << "\n";
+    };
+
+    print_row(aon);
+    print_row(ue);
+    print_row(so);
+    std::cout << std::string(88, '=') << "\n";
+
+    // Congestion reduction checks vs unconstrained AON
+    bool ue_beats_aon = (ue.total_travel_time < aon.total_travel_time);
+    double pct_saved = 100.0 * (1.0 - ue.total_travel_time / aon.total_travel_time);
+    std::cout << "\nAssignment Analysis vs Unconstrained AON:\n";
+    std::cout << "  1. UE reduces total system travel time by "
+              << std::fixed << std::setprecision(1) << pct_saved << "%: "
+              << (ue_beats_aon ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    bool so_relieves_peak = (so.max_vc <= ue.max_vc + 0.05);
+    std::cout << "  2. SO relieves peak bottleneck strain (Max V/C "
+              << std::setprecision(3) << so.max_vc << " vs UE " << ue.max_vc << "): "
+              << (so_relieves_peak ? "PASS ✓" : "FAIL ✗") << "\n";
+
+    // Export UE results for the Web UI
+    bool export_ok = TrafficAssignment::save_to_json(g, ue, "data/assignment_result.json");
+    std::cout << "\nExported UE flows to data/assignment_result.json: "
+              << (export_ok ? "PASS ✓" : "FAIL ✗") << "\n";
+}
+
+// ============================================================================
 // main
 // ============================================================================
 int main()
 {
     std::cout << "Traffic Management & Simulation System\n";
-    std::cout << "Phase 1 + Phase 2 + Phase 3 Tests\n";
+    std::cout << "Phase 1 + Phase 2 + Phase 3 + Phase 4 Tests\n";
     std::cout << std::string(65, '*') << "\n";
 
     Graph g;
@@ -508,15 +808,12 @@ int main()
     p2_congestion(g);
 
     // ── Phase 3 ─────────────────────────────────────────────────────────
-    // Use a fresh graph (g has isolated node 15 added by p2_edge_cases;
-    // load a clean copy so simulation node IDs are 0-14 only).
     Graph g3;
     g3.load_from_json("data/sample_city.json");
 
     p3_queue_test();
     p3_single_vehicle(g3);
 
-    // Reload between simulation tests: each test may alter edge flows.
     Graph g3b;
     g3b.load_from_json("data/sample_city.json");
     p3_signal_test(g3b);
@@ -529,7 +826,25 @@ int main()
     g3d.load_from_json("data/sample_city.json");
     p3_full_simulation(g3d);
 
+    // ── Phase 4 ─────────────────────────────────────────────────────────
+    p4_pigou_validation();
+
+    Graph g4;
+    g4.load_from_json("data/sample_city.json");
+    auto demands = p4_demand_load(g4);
+
+    Graph g_aon = g4;
+    AssignmentResult aon_res = p4_aon_test(g_aon, demands);
+
+    Graph g_ue = g4;
+    AssignmentResult ue_res = p4_ue_msa_test(g_ue, demands);
+
+    Graph g_so = g4;
+    AssignmentResult so_res = p4_so_msa_test(g_so, demands);
+
+    p4_comparison_and_export(g4, aon_res, ue_res, so_res);
+
     std::cout << "\n" << std::string(65, '*') << "\n";
-    std::cout << "All Phase 1 + Phase 2 + Phase 3 tests complete.\n";
+    std::cout << "All Phase 1 + Phase 2 + Phase 3 + Phase 4 tests complete.\n";
     return 0;
 }

@@ -1,0 +1,12 @@
+[
+  { "origin": 10, "destination": 8,  "demand": 1800.0, "description": "West_Suburb to East_Suburb (cross-city corridor)" },
+  { "origin": 1,  "destination": 5,  "demand": 1400.0, "description": "Airport to Business_District (business commute)" },
+  { "origin": 7,  "destination": 9,  "demand": 1600.0, "description": "North_Suburb to South_Suburb (north-south arterial)" },
+  { "origin": 0,  "destination": 11, "demand": 1500.0, "description": "Central_Station to Tech_Park (tech commute)" },
+  { "origin": 9,  "destination": 7,  "demand": 1300.0, "description": "South_Suburb to North_Suburb (reverse commute)" },
+  { "origin": 12, "destination": 3,  "demand": 1200.0, "description": "Stadium to Hospital (crosstown)" },
+  { "origin": 1,  "destination": 11, "demand": 1400.0, "description": "Airport to Tech_Park (visitor travel)" },
+  { "origin": 10, "destination": 14, "demand": 1100.0, "description": "West_Suburb to Industrial_Zone (worker shift)" },
+  { "origin": 2,  "destination": 8,  "demand": 1300.0, "description": "University to East_Suburb (student/staff traffic)" },
+  { "origin": 6,  "destination": 13, "demand": 1200.0, "description": "City_Park to Old_Market (shopping & leisure)" }
+]
