@@ -16,6 +16,7 @@
 // =============================================================================
 #pragma once
 #include <vector>
+#include <utility>
 #include <stdexcept>
 
 template<typename T>

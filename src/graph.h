@@ -122,6 +122,11 @@ public:
     // Close / reopen a road segment.  Time: O(degree(from))
     bool set_closed(int from, int to, bool closed);
 
+    // Maximum speed over all edges (euclidean_dist / free_flow_time).
+    // Used by A* heuristic to guarantee admissibility (never overestimating).
+    // Time: O(E)
+    double get_max_speed() const;
+
     // ── Counts ────────────────────────────────────────────────────────────────
     int node_count() const { return static_cast<int>(nodes.size()); }
     int edge_count() const;   // counts directed edges

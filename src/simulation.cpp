@@ -233,15 +233,28 @@ void Simulation::on_enters_edge(const EventData& e, double t)
     exit_e.to_node    = to;
     push_event(t + travel_t, exit_e);
 
-    // Cascade: if more vehicles in queue and signal still green, let the next
-    // one enter after a small headway gap.
-    if (!queues_[key].isEmpty() && is_green(from, to, t + cfg_.headway)) {
-        EventData nxt;
-        nxt.type       = EventType::VEHICLE_ENTERS_EDGE;
-        nxt.vehicle_id = -1;   // actual id dequeued when this fires
-        nxt.from_node  = from;
-        nxt.to_node    = to;
-        push_event(t + cfg_.headway, nxt);
+    // Cascade: if more vehicles in queue, handle them:
+    // If signal remains green after headway gap, schedule next entry.
+    // If signal will be red at t + headway, schedule SIGNAL_CHECK for the next green phase
+    // so waiting vehicles are NOT stranded indefinitely.
+    if (!queues_[key].isEmpty()) {
+        if (is_green(from, to, t + cfg_.headway)) {
+            EventData nxt;
+            nxt.type       = EventType::VEHICLE_ENTERS_EDGE;
+            nxt.vehicle_id = -1;   // actual id dequeued when this fires
+            nxt.from_node  = from;
+            nxt.to_node    = to;
+            push_event(t + cfg_.headway, nxt);
+        } else {
+            // Signal turns red before next headway gap: schedule wakeup at next green
+            double green_t = next_green_time(from, to, t + cfg_.headway);
+            EventData chk;
+            chk.type       = EventType::SIGNAL_CHECK;
+            chk.vehicle_id = -1;
+            chk.from_node  = from;
+            chk.to_node    = to;
+            push_event(green_t, chk);
+        }
     }
 }
 

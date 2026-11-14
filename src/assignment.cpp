@@ -275,7 +275,7 @@ AssignmentResult TrafficAssignment::run_msa(
     bool verbose)
 {
     AssignmentResult res;
-    res.method = system_optimal ? "SO" : "UE";
+    res.method = system_optimal ? "SO_MSA" : "UE_MSA";
 
     // Step 0: Initial AON at free-flow times
     auto ff_weight_fn = [](int /*u*/, int /*v*/, const Edge& e) {
@@ -292,9 +292,6 @@ AssignmentResult TrafficAssignment::run_msa(
     }
 
     for (iter = 2; iter <= max_iter; ++iter) {
-        // Link cost function:
-        // For UE: user travel time t(x) = t0 * (1 + 0.15 * (x/c)^4)
-        // For SO: marginal cost m(x) = t(x) + x * t'(x) = t0 * (1 + 0.75 * (x/c)^4)
         auto cost_fn = [&](int u, int v, const Edge& e) {
             auto key = std::make_pair(u, v);
             double x = current_x.count(key) ? current_x.at(key) : 0.0;
@@ -305,9 +302,6 @@ AssignmentResult TrafficAssignment::run_msa(
                 return e.free_flow_time * (1.0 + 0.15 * std::pow(ratio, 4.0));
             } else {
                 // System Optimal: Marginal cost = t(x) + x * t'(x)
-                // t'(x) = t0 * 0.15 * 4 * x^3 / c^4
-                // x * t'(x) = t0 * 0.60 * (x/c)^4
-                // marginal_cost = t0 * (1 + 0.75 * (x/c)^4)
                 return e.free_flow_time * (1.0 + 0.75 * std::pow(ratio, 4.0));
             }
         };
@@ -320,9 +314,9 @@ AssignmentResult TrafficAssignment::run_msa(
         res.gap_history.push_back(gap);
         last_gap = gap;
 
-        if (verbose && (iter == 2 || iter % 5 == 0 || gap < target_gap || iter == max_iter)) {
+        if (verbose && (iter == 2 || iter % 50 == 0 || gap < target_gap || iter == max_iter)) {
             double cur_tstt = compute_tstt(g, current_x);
-            std::cout << "  Iter " << std::setw(3) << iter
+            std::cout << "  Iter " << std::setw(4) << iter
                       << " │ Step λ=" << std::fixed << std::setprecision(4) << (1.0 / iter)
                       << " │ RelGap=" << std::setprecision(6) << gap
                       << " │ TSTT=" << std::setprecision(1) << cur_tstt << " veh-min/h\n";
@@ -380,10 +374,162 @@ AssignmentResult TrafficAssignment::run_msa(
     return res;
 }
 
-// ── Default Demand Table ──────────────────────────────────────────────────────
-std::vector<ODDemand> TrafficAssignment::get_default_demand()
+// ── run_frank_wolfe ───────────────────────────────────────────────────────────
+// Frank-Wolfe Algorithm with Bisection Line Search:
+// At each iteration, finds the exact optimal step size lambda in [0, 1] that
+// minimizes the convex objective along the descent direction d = y - x.
+// Guarantees monotonic decrease in objective and much faster convergence than MSA.
+AssignmentResult TrafficAssignment::run_frank_wolfe(
+    Graph& g,
+    const std::vector<ODDemand>& demands,
+    bool system_optimal,
+    int max_iter,
+    double target_gap,
+    bool verbose)
 {
-    return {
+    AssignmentResult res;
+    res.method = system_optimal ? "SO_FW" : "UE_FW";
+
+    // Step 0: Initial AON at free-flow times
+    auto ff_weight_fn = [](int /*u*/, int /*v*/, const Edge& e) {
+        return e.free_flow_time;
+    };
+    std::map<std::pair<int, int>, double> current_x = auxiliary_aon(g, demands, ff_weight_fn);
+
+    int iter = 1;
+    double last_gap = 1.0;
+
+    if (verbose) {
+        std::cout << "\nStarting Frank-Wolfe (" << res.method << ") for up to " << max_iter
+                  << " iterations (target gap=" << target_gap << ")...\n";
+    }
+
+    for (iter = 1; iter <= max_iter; ++iter) {
+        auto cost_fn = [&](int u, int v, const Edge& e) {
+            auto key = std::make_pair(u, v);
+            double x = current_x.count(key) ? current_x.at(key) : 0.0;
+            double ratio = (e.capacity > 0.0) ? (x / e.capacity) : 0.0;
+
+            if (!system_optimal) {
+                // UE: BPR travel time
+                return e.free_flow_time * (1.0 + 0.15 * std::pow(ratio, 4.0));
+            } else {
+                // SO: Marginal cost
+                return e.free_flow_time * (1.0 + 0.75 * std::pow(ratio, 4.0));
+            }
+        };
+
+        // Auxiliary flow y^(iter)
+        std::map<std::pair<int, int>, double> y = auxiliary_aon(g, demands, cost_fn);
+
+        // Compute relative gap
+        double gap = compute_relative_gap(g, current_x, y, cost_fn);
+        res.gap_history.push_back(gap);
+        last_gap = gap;
+
+        if (verbose && (iter == 1 || iter % 10 == 0 || gap < target_gap || iter == max_iter)) {
+            double cur_tstt = compute_tstt(g, current_x);
+            std::cout << "  Iter " << std::setw(4) << iter
+                      << " │ RelGap=" << std::fixed << std::setprecision(6) << gap
+                      << " │ TSTT=" << std::setprecision(1) << cur_tstt << " veh-min/h\n";
+        }
+
+        if (gap < target_gap) {
+            break;
+        }
+
+        // Bisection line search on lambda in [0, 1]
+        // Derivative wrt lambda:
+        // g(lambda) = sum_a (y_a - x_a) * cost_a(x_a + lambda * (y_a - x_a))
+        auto dZ_dlambda = [&](double lambda) -> double {
+            double sum = 0.0;
+            for (const auto& kv : g.adj) {
+                int u = kv.first;
+                for (const Edge& e : kv.second) {
+                    auto key = std::make_pair(u, e.to);
+                    double x_a = current_x.count(key) ? current_x.at(key) : 0.0;
+                    double y_a = y.count(key) ? y.at(key) : 0.0;
+                    double w_a = x_a + lambda * (y_a - x_a);
+                    if (w_a < 0.0) w_a = 0.0;
+
+                    double ratio = (e.capacity > 0.0) ? (w_a / e.capacity) : 0.0;
+                    double cost = (!system_optimal)
+                        ? e.free_flow_time * (1.0 + 0.15 * std::pow(ratio, 4.0))
+                        : e.free_flow_time * (1.0 + 0.75 * std::pow(ratio, 4.0));
+
+                    sum += (y_a - x_a) * cost;
+                }
+            }
+            return sum;
+        };
+
+        double lo = 0.0, hi = 1.0;
+        double opt_lambda = 0.0;
+        if (dZ_dlambda(0.0) >= 0.0) {
+            opt_lambda = 0.0;
+        } else if (dZ_dlambda(1.0) <= 0.0) {
+            opt_lambda = 1.0;
+        } else {
+            for (int b = 0; b < 25; ++b) {
+                double mid = 0.5 * (lo + hi);
+                double val = dZ_dlambda(mid);
+                if (val < 0.0) lo = mid;
+                else hi = mid;
+            }
+            opt_lambda = 0.5 * (lo + hi);
+        }
+
+        // Update flows
+        for (auto& kv : current_x) {
+            double y_val = y.count(kv.first) ? y.at(kv.first) : 0.0;
+            kv.second += opt_lambda * (y_val - kv.second);
+        }
+    }
+
+    res.iterations = std::min(iter, max_iter);
+    res.final_gap  = last_gap;
+    res.flows      = current_x;
+    res.total_travel_time = compute_tstt(g, current_x);
+
+    // Compute detailed stats
+    double max_vc = 0.0;
+    int over_cap = 0;
+
+    for (const auto& kv : g.adj) {
+        int u = kv.first;
+        for (const Edge& e : kv.second) {
+            auto key = std::make_pair(u, e.to);
+            double x = res.flows.count(key) ? res.flows.at(key) : 0.0;
+            double vc = (e.capacity > 0.0) ? (x / e.capacity) : 0.0;
+            double t  = e.free_flow_time * (1.0 + 0.15 * std::pow(vc, 4.0));
+
+            if (vc > max_vc) max_vc = vc;
+            if (vc > 1.0) ++over_cap;
+
+            EdgeFlowDetail d;
+            d.from = u;
+            d.to   = e.to;
+            d.from_name = g.nodes.count(u) ? g.nodes.at(u).name : std::to_string(u);
+            d.to_name   = g.nodes.count(e.to) ? g.nodes.at(e.to).name : std::to_string(e.to);
+            d.flow = x;
+            d.capacity = e.capacity;
+            d.free_flow_time = e.free_flow_time;
+            d.travel_time = t;
+            d.vc_ratio = vc;
+            res.edge_details.push_back(d);
+        }
+    }
+
+    res.max_vc = max_vc;
+    res.edges_over_capacity = over_cap;
+    apply_flows_to_graph(g, res.flows);
+    return res;
+}
+
+// ── Default Demand Table ──────────────────────────────────────────────────────
+std::vector<ODDemand> TrafficAssignment::get_default_demand(double demand_scale)
+{
+    std::vector<ODDemand> raw = {
         {10, 8,  1800.0, "West_Suburb to East_Suburb (cross-city corridor)"},
         {1,  5,  1400.0, "Airport to Business_District (business commute)"},
         {7,  9,  1600.0, "North_Suburb to South_Suburb (north-south arterial)"},
@@ -395,16 +541,18 @@ std::vector<ODDemand> TrafficAssignment::get_default_demand()
         {2,  8,  1300.0, "University to East_Suburb (student/staff traffic)"},
         {6,  13, 1200.0, "City_Park to Old_Market (shopping & leisure)"}
     };
+    for (auto& d : raw) d.demand *= demand_scale;
+    return raw;
 }
 
 // ── load_demand ───────────────────────────────────────────────────────────────
-// Robust JSON parser for demand.json
-std::vector<ODDemand> TrafficAssignment::load_demand(const std::string& filepath)
+// Robust JSON parser for demand.json with configurable scale factor
+std::vector<ODDemand> TrafficAssignment::load_demand(const std::string& filepath, double demand_scale)
 {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         std::cerr << "[Assignment] Cannot open " << filepath << " – using default demand.\n";
-        return get_default_demand();
+        return get_default_demand(demand_scale);
     }
 
     std::ostringstream ss;
@@ -444,7 +592,7 @@ std::vector<ODDemand> TrafficAssignment::load_demand(const std::string& filepath
             if (!o_str.empty() && !d_str.empty() && !m_str.empty()) {
                 int orig = std::stoi(o_str);
                 int dest = std::stoi(d_str);
-                double dem = std::stod(m_str);
+                double dem = std::stod(m_str) * demand_scale;
                 list.emplace_back(orig, dest, dem, desc);
             }
         } catch (...) {
@@ -454,7 +602,7 @@ std::vector<ODDemand> TrafficAssignment::load_demand(const std::string& filepath
 
     if (list.empty()) {
         std::cerr << "[Assignment] No valid demand entries found in " << filepath << " – using default.\n";
-        return get_default_demand();
+        return get_default_demand(demand_scale);
     }
 
     return list;

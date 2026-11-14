@@ -46,12 +46,6 @@
 #include <limits>
 #include <cmath>       // std::sqrt
 
-// Maximum plausible travel speed in coordinate units per minute.
-// Our data has free_flow_time in minutes and coordinates in km-like units.
-// The fastest edge in sample_city.json is ~0.85 units/min.
-// Using 1.5 gives a comfortable safety margin while still pruning well.
-static constexpr double ASTAR_MAX_SPEED = 1.5;
-
 // =============================================================================
 // astar
 // =============================================================================
@@ -59,11 +53,15 @@ PathResult astar(const Graph& g, int src, int dst)
 {
     const double INF = std::numeric_limits<double>::infinity();
 
+    // Dynamically compute the maximum possible travel speed across the network
+    // (euclidean distance / free-flow time) to guarantee admissibility: h(u) <= true_cost(u, dst).
+    const double max_speed = g.get_max_speed();
+
     // Heuristic: straight-line distance divided by max possible speed.
     // Returns 0 if u IS the destination (h of goal = 0).
     auto heuristic = [&](int u) -> double {
         if (u == dst) return 0.0;
-        return g.euclidean_dist(u, dst) / ASTAR_MAX_SPEED;
+        return g.euclidean_dist(u, dst) / max_speed;
     };
 
     // ── Initialise ────────────────────────────────────────────────────────

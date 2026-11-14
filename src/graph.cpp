@@ -8,6 +8,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <iomanip>   // setw
+#include <cctype>
+#include <algorithm>
 
 // =============================================================================
 // ── Tiny JSON helpers ────────────────────────────────────────────────────────
@@ -216,6 +218,10 @@ bool Graph::load_from_json(const std::string& filepath)
             if (e.free_flow_time <= 0)
                 throw std::invalid_argument("free_flow_time must be > 0");
 
+            // Verify both endpoints exist in the loaded nodes
+            if (nodes.count(e.from) == 0 || nodes.count(e.to) == 0)
+                throw std::invalid_argument("edge endpoint not in loaded nodes");
+
             // forward direction
             add_edge(e);
             // reverse direction (bidirectional road)
@@ -347,4 +353,23 @@ int Graph::edge_count() const
     for (const auto& [id, edges] : adj)
         count += static_cast<int>(edges.size());
     return count;
+}
+
+// get_max_speed
+// -------------
+// Computes max speed = max_{e} (euclidean_dist(e.from, e.to) / e.free_flow_time).
+// Guaranteed to be >= 1.0 (defaults to 1.5 if no edges).
+double Graph::get_max_speed() const
+{
+    double max_spd = 1.0;
+    for (const auto& [u, edges] : adj) {
+        for (const Edge& e : edges) {
+            if (e.free_flow_time > 0.0) {
+                double dist = euclidean_dist(u, e.to);
+                double spd  = dist / e.free_flow_time;
+                if (spd > max_spd) max_spd = spd;
+            }
+        }
+    }
+    return max_spd;
 }

@@ -1,112 +1,24 @@
 {
   "summary": {
-    "method": "UE",
-    "iterations": 80,
-    "final_gap": 0.002839,
-    "total_travel_time_veh_min": 282906.69,
-    "total_travel_time_veh_hrs": 4715.11,
-    "max_vc": 1.684,
-    "edges_over_capacity": 18
+    "method": "UE_FW",
+    "iterations": 5,
+    "final_gap": 0.000662,
+    "total_travel_time_veh_min": 77632.41,
+    "total_travel_time_veh_hrs": 1293.87,
+    "max_vc": 1.052,
+    "edges_over_capacity": 1
   },
   "edges": [
     {
-      "from": 14,
-      "to": 5,
-      "from_name": "Industrial_Zone",
-      "to_name": "Business_District",
-      "flow": 912.5,
-      "capacity": 1600.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.063,
-      "vc_ratio": 0.570
-    },
-    {
-      "from": 14,
-      "to": 6,
-      "from_name": "Industrial_Zone",
-      "to_name": "City_Park",
-      "flow": 0.0,
-      "capacity": 1400.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 14,
-      "to": 8,
-      "from_name": "Industrial_Zone",
-      "to_name": "East_Suburb",
-      "flow": 607.5,
-      "capacity": 1500.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.020,
-      "vc_ratio": 0.405
-    },
-    {
-      "from": 14,
-      "to": 9,
-      "from_name": "Industrial_Zone",
-      "to_name": "South_Suburb",
-      "flow": 20.0,
-      "capacity": 1300.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.015
-    },
-    {
-      "from": 13,
-      "to": 0,
-      "from_name": "Old_Market",
-      "to_name": "Central_Station",
-      "flow": 1630.0,
-      "capacity": 2000.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.199,
-      "vc_ratio": 0.815
-    },
-    {
-      "from": 13,
-      "to": 2,
-      "from_name": "Old_Market",
-      "to_name": "University",
-      "flow": 0.0,
-      "capacity": 1600.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 13,
-      "to": 3,
-      "from_name": "Old_Market",
-      "to_name": "Hospital",
-      "flow": 2475.0,
-      "capacity": 1600.0,
-      "free_flow_time": 5.00,
-      "travel_time": 9.294,
-      "vc_ratio": 1.547
-    },
-    {
-      "from": 13,
-      "to": 7,
-      "from_name": "Old_Market",
-      "to_name": "North_Suburb",
-      "flow": 780.0,
-      "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.107,
-      "vc_ratio": 0.650
-    },
-    {
       "from": 0,
       "to": 13,
       "from_name": "Central_Station",
       "to_name": "Old_Market",
-      "flow": 2111.3,
+      "flow": 1176.0,
       "capacity": 2000.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.559,
-      "vc_ratio": 1.056
+      "free_flow_time": 3.0,
+      "travel_time": 3.054,
+      "vc_ratio": 0.588
     },
     {
       "from": 0,
@@ -115,53 +27,53 @@
       "to_name": "Shopping_Mall",
       "flow": 0.0,
       "capacity": 1800.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 0,
       "to": 5,
       "from_name": "Central_Station",
       "to_name": "Business_District",
-      "flow": 3367.5,
+      "flow": 2104.0,
       "capacity": 2000.0,
-      "free_flow_time": 5.00,
-      "travel_time": 11.028,
-      "vc_ratio": 1.684
+      "free_flow_time": 5.0,
+      "travel_time": 5.919,
+      "vc_ratio": 1.052
     },
     {
       "from": 0,
       "to": 6,
       "from_name": "Central_Station",
       "to_name": "City_Park",
-      "flow": 1580.0,
+      "flow": 640.0,
       "capacity": 1500.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.739,
-      "vc_ratio": 1.053
+      "free_flow_time": 4.0,
+      "travel_time": 4.02,
+      "vc_ratio": 0.427
     },
     {
       "from": 1,
       "to": 2,
       "from_name": "Airport",
       "to_name": "University",
-      "flow": 2152.5,
+      "flow": 1120.0,
       "capacity": 1500.0,
-      "free_flow_time": 5.00,
-      "travel_time": 8.180,
-      "vc_ratio": 1.435
+      "free_flow_time": 5.0,
+      "travel_time": 5.233,
+      "vc_ratio": 0.747
     },
     {
       "from": 1,
       "to": 10,
       "from_name": "Airport",
       "to_name": "West_Suburb",
-      "flow": 647.5,
+      "flow": 0.0,
       "capacity": 1200.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.064,
-      "vc_ratio": 0.540
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 2,
@@ -170,64 +82,64 @@
       "to_name": "Airport",
       "flow": 0.0,
       "capacity": 1500.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 2,
       "to": 4,
       "from_name": "University",
       "to_name": "Shopping_Mall",
-      "flow": 115.0,
+      "flow": 0.0,
       "capacity": 1600.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.000,
-      "vc_ratio": 0.072
+      "free_flow_time": 3.0,
+      "travel_time": 3.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 2,
       "to": 13,
       "from_name": "University",
       "to_name": "Old_Market",
-      "flow": 2393.7,
+      "flow": 1197.2,
       "capacity": 1600.0,
-      "free_flow_time": 3.00,
-      "travel_time": 5.254,
-      "vc_ratio": 1.496
+      "free_flow_time": 3.0,
+      "travel_time": 3.141,
+      "vc_ratio": 0.748
     },
     {
       "from": 2,
       "to": 7,
       "from_name": "University",
       "to_name": "North_Suburb",
-      "flow": 1771.2,
+      "flow": 746.7,
       "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 6.848,
-      "vc_ratio": 1.476
+      "free_flow_time": 4.0,
+      "travel_time": 4.09,
+      "vc_ratio": 0.622
     },
     {
       "from": 3,
       "to": 11,
       "from_name": "Hospital",
       "to_name": "Tech_Park",
-      "flow": 341.3,
+      "flow": 0.0,
       "capacity": 1800.0,
-      "free_flow_time": 2.00,
-      "travel_time": 2.000,
-      "vc_ratio": 0.190
+      "free_flow_time": 2.0,
+      "travel_time": 2.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 3,
       "to": 5,
       "from_name": "Hospital",
       "to_name": "Business_District",
-      "flow": 1323.8,
+      "flow": 109.3,
       "capacity": 2000.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.115,
-      "vc_ratio": 0.662
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.055
     },
     {
       "from": 3,
@@ -236,31 +148,31 @@
       "to_name": "Old_Market",
       "flow": 0.0,
       "capacity": 1600.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 4,
       "to": 0,
       "from_name": "Shopping_Mall",
       "to_name": "Central_Station",
-      "flow": 1948.8,
+      "flow": 720.0,
       "capacity": 1800.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.824,
-      "vc_ratio": 1.083
+      "free_flow_time": 4.0,
+      "travel_time": 4.015,
+      "vc_ratio": 0.4
     },
     {
       "from": 4,
       "to": 2,
       "from_name": "Shopping_Mall",
       "to_name": "University",
-      "flow": 827.5,
+      "flow": 304.0,
       "capacity": 1600.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.032,
-      "vc_ratio": 0.517
+      "free_flow_time": 3.0,
+      "travel_time": 3.001,
+      "vc_ratio": 0.19
     },
     {
       "from": 4,
@@ -269,9 +181,9 @@
       "to_name": "West_Suburb",
       "flow": 0.0,
       "capacity": 1400.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 4,
@@ -280,9 +192,9 @@
       "to_name": "Stadium",
       "flow": 0.0,
       "capacity": 1500.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 5,
@@ -291,262 +203,262 @@
       "to_name": "Central_Station",
       "flow": 0.0,
       "capacity": 2000.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 5,
       "to": 3,
       "from_name": "Business_District",
       "to_name": "Hospital",
-      "flow": 390.0,
+      "flow": 0.0,
       "capacity": 2000.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.001,
-      "vc_ratio": 0.195
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
     },
     {
       "from": 5,
       "to": 8,
       "from_name": "Business_District",
       "to_name": "East_Suburb",
-      "flow": 2492.5,
+      "flow": 1240.0,
       "capacity": 2000.0,
-      "free_flow_time": 3.00,
-      "travel_time": 4.086,
-      "vc_ratio": 1.246
+      "free_flow_time": 3.0,
+      "travel_time": 3.066,
+      "vc_ratio": 0.62
     },
     {
       "from": 5,
       "to": 11,
       "from_name": "Business_District",
       "to_name": "Tech_Park",
-      "flow": 1888.8,
+      "flow": 600.0,
       "capacity": 1800.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.546,
-      "vc_ratio": 1.049
-    },
-    {
-      "from": 5,
-      "to": 14,
-      "from_name": "Business_District",
-      "to_name": "Industrial_Zone",
-      "flow": 33.7,
-      "capacity": 1600.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.000,
-      "vc_ratio": 0.021
-    },
-    {
-      "from": 6,
-      "to": 0,
-      "from_name": "City_Park",
-      "to_name": "Central_Station",
-      "flow": 1980.0,
-      "capacity": 1500.0,
-      "free_flow_time": 4.00,
-      "travel_time": 5.822,
-      "vc_ratio": 1.320
-    },
-    {
-      "from": 6,
-      "to": 9,
-      "from_name": "City_Park",
-      "to_name": "South_Suburb",
-      "flow": 1593.8,
-      "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 5.867,
-      "vc_ratio": 1.328
-    },
-    {
-      "from": 6,
-      "to": 12,
-      "from_name": "City_Park",
-      "to_name": "Stadium",
-      "flow": 0.0,
-      "capacity": 1500.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 6,
-      "to": 14,
-      "from_name": "City_Park",
-      "to_name": "Industrial_Zone",
-      "flow": 2072.5,
-      "capacity": 1400.0,
-      "free_flow_time": 5.00,
-      "travel_time": 8.602,
-      "vc_ratio": 1.480
-    },
-    {
-      "from": 7,
-      "to": 2,
-      "from_name": "North_Suburb",
-      "to_name": "University",
-      "flow": 0.0,
-      "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 7,
-      "to": 13,
-      "from_name": "North_Suburb",
-      "to_name": "Old_Market",
-      "flow": 1580.0,
-      "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 5.803,
-      "vc_ratio": 1.317
-    },
-    {
-      "from": 7,
-      "to": 11,
-      "from_name": "North_Suburb",
-      "to_name": "Tech_Park",
-      "flow": 1791.3,
-      "capacity": 1200.0,
-      "free_flow_time": 5.00,
-      "travel_time": 8.724,
-      "vc_ratio": 1.493
-    },
-    {
-      "from": 8,
-      "to": 5,
-      "from_name": "East_Suburb",
-      "to_name": "Business_District",
-      "flow": 0.0,
-      "capacity": 2000.0,
-      "free_flow_time": 3.00,
-      "travel_time": 3.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 8,
-      "to": 14,
-      "from_name": "East_Suburb",
-      "to_name": "Industrial_Zone",
-      "flow": 0.0,
-      "capacity": 1500.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 9,
-      "to": 6,
-      "from_name": "South_Suburb",
-      "to_name": "City_Park",
-      "flow": 780.0,
-      "capacity": 1200.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.107,
-      "vc_ratio": 0.650
-    },
-    {
-      "from": 9,
-      "to": 14,
-      "from_name": "South_Suburb",
-      "to_name": "Industrial_Zone",
-      "flow": 533.8,
-      "capacity": 1300.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.021,
-      "vc_ratio": 0.411
-    },
-    {
-      "from": 10,
-      "to": 1,
-      "from_name": "West_Suburb",
-      "to_name": "Airport",
-      "flow": 0.0,
-      "capacity": 1200.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 10,
-      "to": 4,
-      "from_name": "West_Suburb",
-      "to_name": "Shopping_Mall",
-      "flow": 1836.2,
-      "capacity": 1400.0,
-      "free_flow_time": 4.00,
-      "travel_time": 5.776,
-      "vc_ratio": 1.312
-    },
-    {
-      "from": 10,
-      "to": 12,
-      "from_name": "West_Suburb",
-      "to_name": "Stadium",
-      "flow": 1711.2,
-      "capacity": 1300.0,
-      "free_flow_time": 5.00,
-      "travel_time": 7.252,
-      "vc_ratio": 1.316
-    },
-    {
-      "from": 11,
-      "to": 3,
-      "from_name": "Tech_Park",
-      "to_name": "Hospital",
-      "flow": 0.0,
-      "capacity": 1800.0,
-      "free_flow_time": 2.00,
-      "travel_time": 2.000,
-      "vc_ratio": 0.000
-    },
-    {
-      "from": 11,
-      "to": 5,
-      "from_name": "Tech_Park",
-      "to_name": "Business_District",
-      "flow": 601.3,
-      "capacity": 1800.0,
-      "free_flow_time": 3.00,
+      "free_flow_time": 3.0,
       "travel_time": 3.006,
-      "vc_ratio": 0.334
+      "vc_ratio": 0.333
     },
     {
-      "from": 11,
-      "to": 7,
-      "from_name": "Tech_Park",
-      "to_name": "North_Suburb",
+      "from": 5,
+      "to": 14,
+      "from_name": "Business_District",
+      "to_name": "Industrial_Zone",
+      "flow": 0.0,
+      "capacity": 1600.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 6,
+      "to": 0,
+      "from_name": "City_Park",
+      "to_name": "Central_Station",
+      "flow": 1176.0,
+      "capacity": 1500.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.227,
+      "vc_ratio": 0.784
+    },
+    {
+      "from": 6,
+      "to": 9,
+      "from_name": "City_Park",
+      "to_name": "South_Suburb",
+      "flow": 640.0,
+      "capacity": 1200.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.049,
+      "vc_ratio": 0.533
+    },
+    {
+      "from": 6,
+      "to": 12,
+      "from_name": "City_Park",
+      "to_name": "Stadium",
+      "flow": 0.0,
+      "capacity": 1500.0,
+      "free_flow_time": 3.0,
+      "travel_time": 3.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 6,
+      "to": 14,
+      "from_name": "City_Park",
+      "to_name": "Industrial_Zone",
+      "flow": 440.0,
+      "capacity": 1400.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.007,
+      "vc_ratio": 0.314
+    },
+    {
+      "from": 7,
+      "to": 2,
+      "from_name": "North_Suburb",
+      "to_name": "University",
+      "flow": 0.0,
+      "capacity": 1200.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 7,
+      "to": 13,
+      "from_name": "North_Suburb",
+      "to_name": "Old_Market",
+      "flow": 640.0,
+      "capacity": 1200.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.049,
+      "vc_ratio": 0.533
+    },
+    {
+      "from": 7,
+      "to": 11,
+      "from_name": "North_Suburb",
+      "to_name": "Tech_Park",
+      "flow": 746.7,
+      "capacity": 1200.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.112,
+      "vc_ratio": 0.622
+    },
+    {
+      "from": 8,
+      "to": 5,
+      "from_name": "East_Suburb",
+      "to_name": "Business_District",
+      "flow": 0.0,
+      "capacity": 2000.0,
+      "free_flow_time": 3.0,
+      "travel_time": 3.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 8,
+      "to": 14,
+      "from_name": "East_Suburb",
+      "to_name": "Industrial_Zone",
+      "flow": 0.0,
+      "capacity": 1500.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 9,
+      "to": 6,
+      "from_name": "South_Suburb",
+      "to_name": "City_Park",
       "flow": 520.0,
       "capacity": 1200.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.026,
+      "free_flow_time": 4.0,
+      "travel_time": 4.021,
       "vc_ratio": 0.433
     },
     {
+      "from": 9,
+      "to": 14,
+      "from_name": "South_Suburb",
+      "to_name": "Industrial_Zone",
+      "flow": 0.0,
+      "capacity": 1300.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 10,
+      "to": 1,
+      "from_name": "West_Suburb",
+      "to_name": "Airport",
+      "flow": 0.0,
+      "capacity": 1200.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 10,
+      "to": 4,
+      "from_name": "West_Suburb",
+      "to_name": "Shopping_Mall",
+      "flow": 720.0,
+      "capacity": 1400.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.042,
+      "vc_ratio": 0.514
+    },
+    {
+      "from": 10,
+      "to": 12,
+      "from_name": "West_Suburb",
+      "to_name": "Stadium",
+      "flow": 440.0,
+      "capacity": 1300.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.01,
+      "vc_ratio": 0.338
+    },
+    {
+      "from": 11,
+      "to": 3,
+      "from_name": "Tech_Park",
+      "to_name": "Hospital",
+      "flow": 0.0,
+      "capacity": 1800.0,
+      "free_flow_time": 2.0,
+      "travel_time": 2.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 11,
+      "to": 5,
+      "from_name": "Tech_Park",
+      "to_name": "Business_District",
+      "flow": 186.7,
+      "capacity": 1800.0,
+      "free_flow_time": 3.0,
+      "travel_time": 3.0,
+      "vc_ratio": 0.104
+    },
+    {
+      "from": 11,
+      "to": 7,
+      "from_name": "Tech_Park",
+      "to_name": "North_Suburb",
+      "flow": 0.0,
+      "capacity": 1200.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
       "from": 12,
       "to": 4,
       "from_name": "Stadium",
       "to_name": "Shopping_Mall",
-      "flow": 825.0,
+      "flow": 304.0,
       "capacity": 1500.0,
-      "free_flow_time": 4.00,
-      "travel_time": 4.055,
-      "vc_ratio": 0.550
+      "free_flow_time": 4.0,
+      "travel_time": 4.001,
+      "vc_ratio": 0.203
     },
     {
       "from": 12,
       "to": 6,
       "from_name": "Stadium",
       "to_name": "City_Park",
-      "flow": 2086.2,
+      "flow": 616.0,
       "capacity": 1500.0,
-      "free_flow_time": 3.00,
-      "travel_time": 4.684,
-      "vc_ratio": 1.391
+      "free_flow_time": 3.0,
+      "travel_time": 3.013,
+      "vc_ratio": 0.411
     },
     {
       "from": 12,
@@ -555,9 +467,97 @@
       "to_name": "West_Suburb",
       "flow": 0.0,
       "capacity": 1300.0,
-      "free_flow_time": 5.00,
-      "travel_time": 5.000,
-      "vc_ratio": 0.000
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 13,
+      "to": 0,
+      "from_name": "Old_Market",
+      "to_name": "Central_Station",
+      "flow": 1424.0,
+      "capacity": 2000.0,
+      "free_flow_time": 3.0,
+      "travel_time": 3.116,
+      "vc_ratio": 0.712
+    },
+    {
+      "from": 13,
+      "to": 2,
+      "from_name": "Old_Market",
+      "to_name": "University",
+      "flow": 0.0,
+      "capacity": 1600.0,
+      "free_flow_time": 3.0,
+      "travel_time": 3.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 13,
+      "to": 3,
+      "from_name": "Old_Market",
+      "to_name": "Hospital",
+      "flow": 589.3,
+      "capacity": 1600.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.014,
+      "vc_ratio": 0.368
+    },
+    {
+      "from": 13,
+      "to": 7,
+      "from_name": "Old_Market",
+      "to_name": "North_Suburb",
+      "flow": 520.0,
+      "capacity": 1200.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.021,
+      "vc_ratio": 0.433
+    },
+    {
+      "from": 14,
+      "to": 5,
+      "from_name": "Industrial_Zone",
+      "to_name": "Business_District",
+      "flow": 0.0,
+      "capacity": 1600.0,
+      "free_flow_time": 4.0,
+      "travel_time": 4.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 14,
+      "to": 6,
+      "from_name": "Industrial_Zone",
+      "to_name": "City_Park",
+      "flow": 0.0,
+      "capacity": 1400.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 14,
+      "to": 8,
+      "from_name": "Industrial_Zone",
+      "to_name": "East_Suburb",
+      "flow": 0.0,
+      "capacity": 1500.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
+    },
+    {
+      "from": 14,
+      "to": 9,
+      "from_name": "Industrial_Zone",
+      "to_name": "South_Suburb",
+      "flow": 0.0,
+      "capacity": 1300.0,
+      "free_flow_time": 5.0,
+      "travel_time": 5.0,
+      "vc_ratio": 0.0
     }
   ]
 }
