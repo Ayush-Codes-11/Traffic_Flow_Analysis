@@ -587,9 +587,3 @@ int main()
 
     return (g_tests_failed == 0) ? 0 : 1;
 }
-
-// Exportable C entry point for whitelisted runners / Python ctypes
-extern "C" __declspec(dllexport) int run_all_tests()
-{
-    return main();
-}

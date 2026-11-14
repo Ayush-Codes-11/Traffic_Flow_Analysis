@@ -1,4 +1,5 @@
 # Build outputs
+traffic_sim
 *.exe
 *.dll
 *.o

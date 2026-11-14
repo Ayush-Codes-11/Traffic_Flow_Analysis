@@ -1,37 +1,30 @@
 # Makefile – Traffic Simulation System
-# Compatible with MinGW g++ on Windows (MSYS2) and Linux/Mac g++
+# Compatible with GCC/Clang on Linux, macOS, and Windows (MinGW)
 #
 # Usage:
 #   make          → build the project
 #   make run      → build + run
-#   make clean    → delete build artefacts
+#   make clean    → delete build artifacts
 
 CXX      = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -static -static-libgcc -static-libstdc++
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
-# Source files (Phase 1 + 2 + 3 + 4)
+# Source files
 SRCS = src/graph.cpp src/dijkstra.cpp src/astar.cpp src/simulation.cpp src/assignment.cpp src/main.cpp
 
-# Output binary and library
-TARGET = traffic_sim.exe
-DLL_TARGET = traffic_sim.dll
+# Output binary
+TARGET = traffic_sim
 
-# Default target: compile
-all: $(TARGET) $(DLL_TARGET)
+all: $(TARGET)
 
-$(TARGET): $(SRCS) src/graph.h
+$(TARGET): $(SRCS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS)
 	@echo "Build successful: $(TARGET)"
 
-$(DLL_TARGET): $(SRCS) src/graph.h
-	$(CXX) $(CXXFLAGS) -shared -o $(DLL_TARGET) $(SRCS)
-	@echo "Build successful: $(DLL_TARGET)"
-
-# Build and run
-run: all
+run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	del /Q $(TARGET) $(DLL_TARGET) 2>nul || rm -f $(TARGET) $(DLL_TARGET)
+	rm -f $(TARGET) $(TARGET).exe *.o *.dll 2>/dev/null || del /Q $(TARGET) $(TARGET).exe *.o *.dll 2>nul || true
 
 .PHONY: all run clean
