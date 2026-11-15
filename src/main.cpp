@@ -11,6 +11,7 @@
 #include "incidents.h"
 #include "sensor_feed.h"
 #include "alerts.h"
+#include "parallel.h"
 
 #include <iostream>
 #include <iomanip>
@@ -981,15 +982,17 @@ static void test_phase5_accident_experiment(
 
     // Theoretical analysis of Scenario 2:
     // When 100 vehicles traverse the network during a 35-minute closure,
-    // rerouted vehicles divert onto narrow detour paths. Under heavy flow,
-    // these detour roads experience secondary congestion (Braess-type spillback).
-    // While rerouting prevents infinite stranding and reduces maximum vehicle wait,
+    // rerouted vehicles divert onto alternative side roads. Under heavy flow,
+    // these detour roads experience secondary congestion transfer onto lower-capacity side roads
+    // (capacities 1,200–1,600 vph vs 2,000 vph on the arterial).
+    // While rerouting prevents vehicle stranding and caps maximum individual delay,
     // detour travel times on saturated side roads can equal or exceed waiting for the arterial to reopen.
     std::cout << "\n[Traffic Engineering Note - Scenario 2 Rerouting Dynamics]:\n"
               << "  Under prolonged arterial closures (t=5..40) with 100 vehicles, diverted traffic\n"
-              << "  loads secondary detour corridors (e.g. Nodes 1, 2, 3), causing localized queue\n"
-              << "  spillback. Rerouting effectively prevents queue starvation and caps maximum individual delay,\n"
-              << "  illustrating the classic congestion transfer effect.\n";
+              << "  loads secondary detour corridors (e.g. Nodes 4, 10, 2, 3), causing localized queue\n"
+              << "  delays due to secondary congestion transfer onto lower-capacity side roads\n"
+              << "  (side road capacities 1,200-1,600 vph vs 2,000 vph on the closed arterial).\n"
+              << "  Rerouting effectively prevents queue starvation and caps maximum individual delay.\n";
 
     // Export alerts and timeseries from sim_on2 for Phase 6 UI
     sim_on2.get_alert_manager().save_alerts_to_json("data/alerts.json");
@@ -1080,8 +1083,9 @@ int main()
     report_check("P4-TEST 4c: Frank-Wolfe SO TSTT <= UE TSTT * 1.001",
                  so_fw_04.total_travel_time <= ue_fw_04.total_travel_time * 1.001);
 
-    // Save network topology and unified assignment results (AON, UE, SO) to data/
+    // Save network topology and unified assignment results (AON, UE, SO) to data/ and web/
     g4.save_network_json("data/network.json");
+    g4.save_network_json("web/network.json");
     bool export_ok = TrafficAssignment::save_all_scenarios_to_json(g4, aon_04, ue_fw_04, so_fw_04, "data/assignment_result.json");
     report_check("P4-TEST 5: Exported assignment results (AON, UE, SO) to data/assignment_result.json", export_ok);
 
@@ -1110,6 +1114,9 @@ int main()
     test_phase5_alert_hysteresis();
     test_phase5_threaded_demo();
     test_phase5_accident_experiment(g4, aon_04, ue_fw_04, so_fw_04);
+
+    // ── Phase 7 ─────────────────────────────────────────────────────────
+    TrafficParallel::run_parallel_benchmark(g4, report_check);
 
     // Final Summary
     std::cout << "\n" << std::string(65, '*') << "\n";
