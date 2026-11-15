@@ -91,8 +91,8 @@ flowchart TD
 | **4** | **Macroscopic Traffic Assignment** | [`src/assignment.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/assignment.h)<br>[`src/assignment.cpp`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/assignment.cpp) | `TrafficAssignment::run_aon()`, `run_msa()`, `run_frank_wolfe()` | Bisection line search for optimal step size $\lambda$; Solves User Equilibrium & System Optimal |
 | **5** | **Dynamic Incidents & Sensor Feeds** | [`src/incidents.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/incidents.h)<br>[`src/sensor_feed.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/sensor_feed.h)<br>[`src/alerts.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/alerts.h) | `IncidentManager`, `SensorFeed`, `AlertManager`, `ThreadSafeQueue` | Dynamic A* diversion threshold; Threaded producer-consumer ingestion; EMA sensor smoothing |
 | **6** | **Web Visualization Dashboard** | [`web/index.html`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/web/index.html)<br>[`web/style.css`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/web/style.css)<br>[`web/app.js`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/web/app.js)<br>[`web/logic.js`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/web/logic.js) | `TrafficLogic`, `AppController` | Zero-dependency standalone SVG map, parallel opposing lanes, canvas line scrubber, print stylesheet |
-| **7** | **Multi-Threaded Query Engine** | [`src/parallel.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/parallel.h)<br>[`src/parallel.cpp`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/parallel.cpp) | `create_grid_network()`, `run_parallel_benchmark()` | `std::thread` query partitioning across 5,000 OD pairs; Demonstrates linear scaling on 1,600-node grid |
-| **8** | **CI/CD & Automated Verification** | [`.github/workflows/ci.yml`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/.github/workflows/ci.yml) | GitHub Actions Pipeline | Ubuntu Linux headless compilation, 40+ assertion checks, node test validation, GitHub Pages automated push |
+| **7** | **Multi-Threaded Query Engine** | [`src/parallel.h`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/parallel.h)<br>[`src/parallel.cpp`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/src/parallel.cpp) | `create_grid_network()`, `run_parallel_benchmark()` | `std::thread` query partitioning across 5,000 OD pairs; Measured speedup of 2.32x to 2.84x on 4 threads (up to 71.0% parallel efficiency) on a 1,600-node grid |
+| **8** | **CI/CD & Automated Verification** | [`.github/workflows/ci.yml`](file:///c:/Users/ayush/OneDrive/Desktop/Traffic%20Flow%20Analysis/.github/workflows/ci.yml) | GitHub Actions Pipeline | Ubuntu Linux headless compilation, 43 automated assertion checks passed, node test validation, GitHub Pages automated push |
 
 ---
 
@@ -132,27 +132,16 @@ Because the C++ engine generates `web/data.js` containing `window.TRAFFIC_DATA =
 
 ## 5. Visual Dashboard Features & Screenshots
 
-```
-+---------------------------------------------------------------------------------------------------+
-|  [Header] Traffic Flow Analysis System | [Status: Data Loaded] [Download CSV] [Print Report]       |
-+---------------------------------------------------------------------------------------------------+
-|  [KPIs]  TSTT: 1,291.87 veh-hrs  |  Peak V/C: 1.041  |  Over-Cap: 1  |  Mode: User Eq. (UE)       |
-+-------------------------------------------------------------+-------------------------------------+
-|  [Toolbar] Scenario: [ UE ] [ SO ] [ AON ]                  |  [Route Navigator (Dijkstra)]       |
-|  [Playback] [ |<< ] [ > / || ] [ >> ] [Time Slider] t=15m   |  From: Central_Station  To: Tech_Park|
-+-------------------------------------------------------------+  Est. Travel Time: 8.07 min         |
-|                                                             +-------------------------------------+
-|  [Interactive SVG Network Topology Map]                    |  [Top Bottlenecks Table]            |
-|  - Directed road segments color-coded by V/C                |  From      To     Flow   Cap    V/C   |
-|  - Bidirectional lanes offset in parallel                   |  0 (Cent)  5(Biz) 2104   2000   1.052 |
-|  - Live hover tooltips (Flow, Cap, V/C, BPR Time)           |  (Clicking highlights on map)       |
-|                                                             +-------------------------------------+
-|                                                             |  [Active Traffic Alerts Feed]       |
-|  [Canvas 2D Time Series: Network V/C vs Time (t=0..60 min)] |  [CLOSURE] Edge 0->13 (t=5..40 min) |
-|  - Incident window highlighted (t=5 to t=40 min)            |  [CONGESTION] Edge 0->5 V/C > 1.0   |
-|  - Interactive vertical scrubber synchronized to map        |  (Clicking jumps timeline scrubber) |
-+-------------------------------------------------------------+-------------------------------------+
-```
+The web dashboard provides interactive visualization for network topology, traffic equilibrium, bottleneck identification, dynamic incident alerts, and time-series V/C playback.
+
+### Screenshots
+- **Network Topology Map**: [docs/screenshots/map.png](docs/screenshots/map.png) — Interactive SVG road network visualization with color-coded V/C ratios, bidirectional parallel lane offset, and live hover tooltips displaying flow, capacity, V/C, and BPR delay.
+- **Bottleneck Analysis & Table**: [docs/screenshots/bottlenecks.png](docs/screenshots/bottlenecks.png) — Real-time ranking of network bottlenecks with interactive link selection and canvas V/C timeline scrubber synchronized to the road network.
+- **Active Alerts & Route Navigator**: [docs/screenshots/alerts.png](docs/screenshots/alerts.png) — Dynamic incident alerts (closures, congestion hysteresis) and interactive Dijkstra origin-destination pathfinder.
+
+### How to View the Dashboard
+- **Live Production Deployment**: Visit **[https://ayush-codes-11.github.io/Traffic_Flow_Analysis/](https://ayush-codes-11.github.io/Traffic_Flow_Analysis/)**
+- **Local Execution**: Double-click `web/index.html` in your file manager to open it in any modern browser (`Chrome`, `Firefox`, `Edge`, `Safari`) without needing a web server. All simulation outputs and topologies are loaded directly from `web/data.js`.
 
 ---
 

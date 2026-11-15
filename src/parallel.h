@@ -3,7 +3,7 @@
 
 #include "graph.h"
 #include <vector>
-#include <utility>
+#include <string>
 
 namespace TrafficParallel {
 
@@ -11,18 +11,25 @@ namespace TrafficParallel {
 // with bidirectional horizontal and vertical edges.
 Graph create_grid_network(int rows, int cols);
 
-// Benchmark result structure
-struct BenchmarkResult {
-    int num_threads;
+struct BenchmarkRun {
+    int threads;
     double elapsed_ms;
     double speedup;
-    double queries_per_sec;
+    double qps;
+};
+
+struct BenchmarkSummary {
+    std::vector<BenchmarkRun> city_runs;
+    std::vector<BenchmarkRun> grid_runs;
+    bool city_all_match = true;
+    bool grid_all_match = true;
+    double best_grid_speedup = 1.0;
 };
 
 // Run parallel Dijkstra / A* route queries for N pairs across 1, 2, 4, and max threads.
 // Validates path cost equivalence between sequential and multi-threaded runs.
-bool run_parallel_benchmark(const Graph& city_graph,
-                            void (*report_cb)(const std::string&, bool));
+BenchmarkSummary run_parallel_benchmark(const Graph& city_graph,
+                                        void (*report_cb)(const std::string&, bool));
 
 } // namespace TrafficParallel
 

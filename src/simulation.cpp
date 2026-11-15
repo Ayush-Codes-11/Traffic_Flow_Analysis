@@ -50,6 +50,7 @@ void Simulation::add_vehicle(int src, int dst, double spawn_time)
         return;
     }
     v.route = pr.path;
+    v.original_route = pr.path;
     vehicles_.push_back(v);
 
     // Schedule arrival at the first edge's queue.
@@ -164,6 +165,11 @@ void Simulation::on_arrives_at_edge(const EventData& e, double t)
             std::vector<int> new_route(v.route.begin(), v.route.begin() + v.route_pos);
             new_route.insert(new_route.end(), pr.path.begin(), pr.path.end());
             v.route = new_route;
+            if (!v.was_rerouted) {
+                v.was_rerouted = true;
+                v.reroute_time = t;
+                v.reroute_node = from;
+            }
             int new_to = pr.path[1];
 
             std::ostringstream oss;
@@ -417,6 +423,11 @@ void Simulation::on_exits_edge(const EventData& e, double t)
                 std::vector<int> new_route(v.route.begin(), v.route.begin() + v.route_pos);
                 new_route.insert(new_route.end(), pr.path.begin(), pr.path.end());
                 v.route = new_route;
+                if (!v.was_rerouted) {
+                    v.was_rerouted = true;
+                    v.reroute_time = t;
+                    v.reroute_node = to;
+                }
                 next_to = v.route[v.route_pos + 1];
 
                 std::ostringstream r_log;
@@ -451,6 +462,11 @@ void Simulation::on_exits_edge(const EventData& e, double t)
                 std::vector<int> new_route(v.route.begin(), v.route.begin() + v.route_pos);
                 new_route.insert(new_route.end(), pr.path.begin(), pr.path.end());
                 v.route = new_route;
+                if (!v.was_rerouted) {
+                    v.was_rerouted = true;
+                    v.reroute_time = t;
+                    v.reroute_node = to;
+                }
                 next_to = v.route[v.route_pos + 1];
 
                 std::ostringstream p_log;
@@ -532,6 +548,11 @@ void Simulation::on_incident_start(const EventData& e, double t)
                 std::vector<int> new_route(v.route.begin(), v.route.begin() + v.route_pos);
                 new_route.insert(new_route.end(), pr.path.begin(), pr.path.end());
                 v.route = new_route;
+                if (!v.was_rerouted) {
+                    v.was_rerouted = true;
+                    v.reroute_time = t;
+                    v.reroute_node = inc.from_node;
+                }
 
                 std::ostringstream oss;
                 oss << std::fixed << std::setprecision(2)

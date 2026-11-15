@@ -78,10 +78,18 @@ Evaluated on the 15-node city network at standard scale factor $0.4$ (Total Netw
 | **User Equilibrium (Frank-Wolfe)** | 3 | $0.000338$ | $77,512.4$ | $1,291.87$ | $1.041$ | 1 |
 | **System Optimal (Frank-Wolfe)** | 28 | $0.000871$ | $76,667.9$ | $1,277.80$ | $0.785$ | 0 |
 
+#### City Network Stress Test (Scale = 1.0, Extreme Peak Demand = 13,800 vph):
+
+| Assignment Method | Iterations | Final Relative Gap | Total Travel Time (veh-min/h) | Total Travel Time (veh-hrs) | Peak Link V/C | Over-Capacity Edges |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **All-or-Nothing (AON)** | 1 | $0.000000$ | $719,816.4$ | $11,996.94$ | $3.000$ | 15 |
+| **User Equilibrium (Frank-Wolfe)** | 228 | $0.000928$ | $283,080.8$ | $4,718.01$ | $1.680$ | 18 |
+| **System Optimal (Frank-Wolfe)** | 792 | $0.000998$ | $278,848.6$ | $4,647.48$ | $1.595$ | 18 |
+
 #### Engineering Findings:
-1. **Wardrop’s Principle Verified:** System Optimal achieves the minimum Total System Travel Time ($1,277.80$ veh-hrs), saving **$14.07$ vehicle-hours per hour** compared to User Equilibrium ($1,291.87$ veh-hrs).
-2. **Bottleneck Elimination:** Under SO, the marginal social cost pricing redirects flow away from congested corridors, eliminating all over-capacity links and reducing peak link V/C from $1.041$ down to $0.785$.
-3. **Frank-Wolfe Efficiency:** Frank-Wolfe UE achieves convergence ($\text{RelGap} < 10^{-3}$) in only **3 iterations**, whereas MSA required **7 iterations**, confirming the mathematical advantage of line search over harmonic step sizing.
+1. **Wardrop’s Principle Verified:** System Optimal achieves the minimum Total System Travel Time ($1,277.80$ veh-hrs at scale 0.4), saving **$14.07$ vehicle-hours per hour** compared to User Equilibrium ($1,291.87$ veh-hrs).
+2. **Bottleneck Elimination:** Under UE (Frank-Wolfe, scale 0.4), the single over-capacity link is **Edge 0→5 (Central_Station → Business_District)** with an assigned flow of $2,082$ vph against a design capacity of $2,000$ vph (Peak V/C = $1.041$). Under System Optimal, marginal social cost pricing shifts traffic onto alternative routes, reducing flow on Edge 0→5 to $1,570$ vph (V/C = $0.785$) and eliminating all over-capacity bottlenecks network-wide.
+3. **Frank-Wolfe Efficiency:** Frank-Wolfe UE achieves convergence ($\text{RelGap} < 10^{-3}$) in only **3 iterations**, whereas MSA required **7 iterations**, confirming the mathematical advantage of line search over harmonic step sizing. Under stress testing (13,800 vph), Frank-Wolfe UE converged in 228 iterations while cutting total system delay from $11,996.94$ veh-hrs (AON) down to $4,718.01$ veh-hrs ($-60.7\%$).
 
 ---
 
@@ -104,28 +112,55 @@ Evaluated under deterministic random seeds on the 15-node, 50-directed-edge city
   - Maximum Individual Travel Time: Reduced from **$48.97$ min** down to **$34.79$ min** (**$-28.9\%$**).
   - Total Queue Wait Time: Reduced from **$542.89$ min** down to **$486.29$ min** (**$-10.4\%$**).
 
-#### Engineering Analysis:
-- In Scenario 2, rerouting vehicles around the closed arterial diverted flow onto secondary corridors (e.g., via Nodes 4, 10, 2, and 3). 
-- Inspection of `data/sample_city.json` confirms that these secondary roads have lower design capacities ($1,200\text{--}1,600$ vph vs $2,000$ vph on the arterial).
-- Under heavy demand, this diverted volume causes **secondary congestion transfer** onto these narrower side roads. 
+#### Engineering Analysis & Secondary Congestion Transfer:
+- In Scenario 2, rerouting vehicles around the closed arterial (Edge 0→13, capacity $2,000$ vph) diverted flow onto secondary corridors (e.g., via Nodes 4, 10, 2, and 7).
+- Inspection of `data/sample_city.json` confirms that these secondary detour roads have strictly lower design capacities ($1,200\text{--}1,800$ vph vs $2,000$ vph on arterial 0→13):
+  - Edge 0→4 (Shopping Mall): capacity **$1,800$ vph**
+  - Edge 4→2 (University): capacity **$1,600$ vph**
+  - Edge 2→13 (Old Market): capacity **$1,600$ vph**
+  - Edge 2→7 (North Suburb): capacity **$1,200$ vph**
+  - Edge 7→13 (Old Market): capacity **$1,200$ vph**
+- Under heavy demand (100 vehicles), this diverted volume causes **secondary congestion transfer** onto these narrower side roads. 
 - However, dynamic A* rerouting successfully prevented localized gridlock, capped the maximum individual delay from $48.97$ min to $34.79$ min, and eliminated stranded queues.
+
+#### Worked Example: Real Dynamic Rerouting Trace (Scenario 2)
+The discrete-event simulation engine logs real vehicle trajectory traces during execution. The following trace represents the first completed rerouted vehicle in Scenario 2 as recorded directly by the C++ engine:
+
+```text
+====================================================================
+  REAL REROUTING TRACE: Scenario 2 (Vehicle ID 16)
+====================================================================
+  Vehicle ID        : 16
+  Trip OD           : Node 12 (Stadium) -> Node 3 (Hospital)
+  Spawn Time        : 0.33 min
+  Incident Active   : Edge 0 -> 13 closed between t=5.00 min and t=40.00 min
+  Reroute Event     : Triggered at t=5.00 min at Node 6 (City_Park)
+  Original Route    : 12 (Stadium) -> 6 (City_Park) -> 0 (Central_Station) -> 13 (Old_Market) -> 3 (Hospital)
+  Detour Route      : 12 (Stadium) -> 6 (City_Park) -> 0 (Central_Station) -> 5 (Business_District) -> 3 (Hospital)
+  Finish Time       : 26.00 min
+  Total Travel Time : 25.67 min
+  Total Wait Time   : 9.67 min
+====================================================================
+```
+
+*Trace Commentary:* Vehicle 16 spawned at $t=0.33$ min with an original route heading through City Park (6) and Central Station (0) to Old Market (13) and Hospital (3). At $t=5.00$ min, while Vehicle 16 was traversing towards Central Station, Edge $0 \to 13$ was closed by Incident 202. The simulation detected the impending closure at the node level and triggered a dynamic A* search from Node 6. The route was updated to divert via Node 5 (Business District), traversing $0 \to 5 \to 3$ instead of waiting for the arterial to reopen at $t=40.00$ min. The vehicle arrived safely at $t=26.00$ min with total travel time $25.67$ min, avoiding over $30$ minutes of road-closure gridlock.
 
 ---
 
 ### 4.3 Multi-Threaded Batch Routing Scalability
-Evaluated across 5,000 random origin-destination queries:
+Evaluated across 5,000 random origin-destination queries using `std::thread` data-parallel partitioning:
 
 #### Part A: 15-Node City Network
-- **1 Thread:** $4.2$ ms ($1.19 \times 10^6$ queries/sec)
-- **2 Threads:** $3.5$ ms ($1.20\times$ speedup)
-- **4 Threads:** $2.9$ ms ($1.45\times$ speedup)
-- **Analysis:** Individual Dijkstra queries on a 15-node graph execute in $\sim 1\text{--}2$ microseconds. Thread invocation overhead and vector allocation bounds scalability. All parallel query results matched sequential results with $100\%$ precision.
+- **1 Thread:** $9.57$ ms ($522,613$ queries/sec)
+- **2 Threads:** $10.21$ ms ($0.98\times$ speedup)
+- **4 Threads:** $6.93$ ms ($1.44\times$ speedup, $721,267$ queries/sec)
+- **Analysis:** Individual Dijkstra queries on a 15-node graph execute in $\sim 1\text{--}3$ microseconds. Thread invocation overhead, cache migration, and thread synchronization account for a noticeable fraction of total runtime on small networks. All parallel query path costs matched sequential results with $100\%$ precision.
 
 #### Part B: Synthetic 40x40 Grid Network (1,600 Nodes, 6,240 Edges)
-- **1 Thread:** $485.2$ ms ($10,305$ queries/sec)
-- **2 Threads:** $264.1$ ms ($1.84\times$ speedup)
-- **4 Threads:** $148.5$ ms ($3.27\times$ speedup)
-- **Analysis:** With 1,600 nodes, each path search explores hundreds of heap nodes. Computation heavily dominates thread dispatch, demonstrating near-linear scaling across multi-core architectures.
+- **1 Thread:** $1,367.59$ ms ($3,656$ queries/sec)
+- **2 Threads:** $686.13$ ms ($2.00\times$ speedup)
+- **4 Threads:** $591.21$ ms ($2.32\times$ speedup, $8,457$ queries/sec)
+- **Analysis:** With 1,600 nodes, each path search explores hundreds of heap nodes ($\sim 100\text{--}300\ \mu\text{s}$ per query). Computation heavily dominates thread dispatch, achieving a measured speedup of **$2.32\times$ on 4 threads** (parallel efficiency: **$57.9\% = 2.32 / 4 \times 100\%$**) on shared virtualized CI runners. All 5,000 path costs produced by parallel thread pools matched the sequential baseline exactly, verifying algorithmic equivalence.
 
 ---
 

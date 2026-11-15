@@ -15,6 +15,7 @@ struct Vehicle {
 
     // route[0] = src, route.back() = dst, populated by A* at spawn time
     std::vector<int> route;
+    std::vector<int> original_route; // Initial route at spawn time
 
     // route_pos: index in route of the node the vehicle is AT right now.
     // The edge being (or about to be) traversed is route[route_pos] → route[route_pos+1].
@@ -27,10 +28,15 @@ struct Vehicle {
     bool   failed;        // true if route could not be found (unreachable dst)
     std::string failure_reason;
 
+    bool   was_rerouted;  // True if route was dynamically updated mid-journey
+    double reroute_time;  // Timestamp when rerouting was triggered
+    int    reroute_node;  // Node ID where rerouting took place
+
     Vehicle()
         : id(-1), src(-1), dst(-1), route_pos(0),
           entry_time(0), finish_time(-1.0), total_wait(0.0), completed(false),
-          failed(false), failure_reason("") {}
+          failed(false), failure_reason(""),
+          was_rerouted(false), reroute_time(-1.0), reroute_node(-1) {}
 };
 
 // =============================================================================

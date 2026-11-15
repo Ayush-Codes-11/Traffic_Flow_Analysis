@@ -22,6 +22,8 @@
 #include <string>
 #include <cassert>
 #include <random>     // mt19937
+#include <filesystem>
+#include <sstream>
 
 // ── Global Test Accounting ───────────────────────────────────────────────────
 static int g_tests_total  = 0;
@@ -825,7 +827,36 @@ static bool export_unified_web_data(
     return true;
 }
 
-static void test_phase5_accident_experiment(
+struct RerouteTrace {
+    int vid = -1;
+    int src = -1;
+    int dst = -1;
+    std::string src_name;
+    std::string dst_name;
+    double spawn_time = 0.0;
+    double closure_start = 5.0;
+    double closure_end = 40.0;
+    int closed_from = 0;
+    int closed_to = 13;
+    double reroute_time = 0.0;
+    int reroute_node = -1;
+    std::string reroute_node_name;
+    std::vector<int> original_route;
+    std::vector<int> new_route;
+    double finish_time = 0.0;
+    double total_travel_time = 0.0;
+    double total_wait = 0.0;
+};
+
+struct AccidentExperimentData {
+    Simulation::RunMetrics m_off1;
+    Simulation::RunMetrics m_on1;
+    Simulation::RunMetrics m_off2;
+    Simulation::RunMetrics m_on2;
+    RerouteTrace trace;
+};
+
+static AccidentExperimentData test_phase5_accident_experiment(
     const Graph& g_net,
     const AssignmentResult& aon_res,
     const AssignmentResult& ue_res,
@@ -1001,11 +1032,278 @@ static void test_phase5_accident_experiment(
     // Export web/data.js containing unified data package
     export_unified_web_data(g_net, aon_res, ue_res, so_res, sim_on2.get_alert_manager(), "web/data.js");
 
+    AccidentExperimentData exp_data;
+    exp_data.m_off1 = m_off1;
+    exp_data.m_on1 = m_on1;
+    exp_data.m_off2 = m_off2;
+    exp_data.m_on2 = m_on2;
+
+    // Extract real rerouting trace from the first completed rerouted vehicle in Scenario 2
+    for (const auto& v : sim_on2.get_vehicles()) {
+        if (v.was_rerouted && v.completed) {
+            exp_data.trace.vid = v.id;
+            exp_data.trace.src = v.src;
+            exp_data.trace.dst = v.dst;
+            exp_data.trace.src_name = g_net.nodes.count(v.src) ? g_net.nodes.at(v.src).name : ("Node " + std::to_string(v.src));
+            exp_data.trace.dst_name = g_net.nodes.count(v.dst) ? g_net.nodes.at(v.dst).name : ("Node " + std::to_string(v.dst));
+            exp_data.trace.spawn_time = v.entry_time;
+            exp_data.trace.closure_start = 5.0;
+            exp_data.trace.closure_end = 40.0;
+            exp_data.trace.closed_from = 0;
+            exp_data.trace.closed_to = 13;
+            exp_data.trace.reroute_time = v.reroute_time;
+            exp_data.trace.reroute_node = v.reroute_node;
+            exp_data.trace.reroute_node_name = g_net.nodes.count(v.reroute_node) ? g_net.nodes.at(v.reroute_node).name : ("Node " + std::to_string(v.reroute_node));
+            exp_data.trace.original_route = v.original_route;
+            exp_data.trace.new_route = v.route;
+            exp_data.trace.finish_time = v.finish_time;
+            exp_data.trace.total_travel_time = v.finish_time - v.entry_time;
+            exp_data.trace.total_wait = v.total_wait;
+            break;
+        }
+    }
+
+    if (exp_data.trace.vid >= 0) {
+        std::cout << "\n=================================================================\n";
+        std::cout << "  REAL REROUTING TRACE: Scenario 2 (Vehicle ID " << exp_data.trace.vid << ")\n";
+        std::cout << "=================================================================\n";
+        std::cout << "  Vehicle ID        : " << exp_data.trace.vid << "\n";
+        std::cout << "  Trip OD           : Node " << exp_data.trace.src << " (" << exp_data.trace.src_name << ") -> Node " << exp_data.trace.dst << " (" << exp_data.trace.dst_name << ")\n";
+        std::cout << "  Spawn Time        : " << std::fixed << std::setprecision(2) << exp_data.trace.spawn_time << " min\n";
+        std::cout << "  Incident Active   : Edge " << exp_data.trace.closed_from << " -> " << exp_data.trace.closed_to << " closed between t=" << exp_data.trace.closure_start << " min and t=" << exp_data.trace.closure_end << " min\n";
+        std::cout << "  Reroute Event     : Triggered at t=" << exp_data.trace.reroute_time << " min at Node " << exp_data.trace.reroute_node << " (" << exp_data.trace.reroute_node_name << ")\n";
+        std::cout << "  Original Route    : ";
+        for (size_t i = 0; i < exp_data.trace.original_route.size(); ++i) {
+            int nid = exp_data.trace.original_route[i];
+            std::string nname = g_net.nodes.count(nid) ? g_net.nodes.at(nid).name : std::to_string(nid);
+            std::cout << nid << " (" << nname << ")" << (i + 1 < exp_data.trace.original_route.size() ? " -> " : "");
+        }
+        std::cout << "\n  Detour Route      : ";
+        for (size_t i = 0; i < exp_data.trace.new_route.size(); ++i) {
+            int nid = exp_data.trace.new_route[i];
+            std::string nname = g_net.nodes.count(nid) ? g_net.nodes.at(nid).name : std::to_string(nid);
+            std::cout << nid << " (" << nname << ")" << (i + 1 < exp_data.trace.new_route.size() ? " -> " : "");
+        }
+        std::cout << "\n  Finish Time       : " << exp_data.trace.finish_time << " min\n";
+        std::cout << "  Total Travel Time : " << exp_data.trace.total_travel_time << " min\n";
+        std::cout << "  Total Wait Time   : " << exp_data.trace.total_wait << " min\n";
+        std::cout << "=================================================================\n";
+    }
+
     bool sc1_ok = (m_on1.avg_travel_time <= m_off1.avg_travel_time + 1e-4);
     bool sc2_ok = (m_on2.completed > 0 && m_off2.completed > 0);
     report_check("P5-TEST 8a: Scenario 1 rerouting average travel time <= rerouting-off", sc1_ok);
     report_check("P5-TEST 8b: Scenario 2 evaluated (100 vehicles, 35-min closure)", sc2_ok);
     report_check("P5-TEST 8c: Exported data/alerts.json, data/sim_timeseries.json, and web/data.js", true);
+
+    return exp_data;
+}
+
+// ── Results Summary File Exporter ───────────────────────────────────────────
+static bool save_results_summary_file(
+    const std::string& path,
+    const AssignmentResult& aon_04,
+    const AssignmentResult& ue_msa_04,
+    const AssignmentResult& ue_fw_04,
+    const AssignmentResult& so_fw_04,
+    const AssignmentResult& aon_10,
+    const AssignmentResult& ue_fw_10,
+    const AssignmentResult& so_fw_10,
+    const AccidentExperimentData& acc,
+    const TrafficParallel::BenchmarkSummary& bench,
+    const Graph& g_net)
+{
+    try {
+        std::filesystem::path p(path);
+        if (p.has_parent_path()) {
+            std::filesystem::create_directories(p.parent_path());
+        }
+    } catch (...) {}
+
+    std::ofstream out(path);
+    if (!out.is_open()) {
+        std::cerr << "Error: Could not open " << path << " for writing results summary.\n";
+        return false;
+    }
+
+    out << "================================================================================\n";
+    out << "TRAFFIC FLOW ANALYSIS & SIMULATION SYSTEM – BENCHMARK & EXPERIMENT RESULTS\n";
+    out << "Generated automatically during CI run from C++ executable\n";
+    out << "================================================================================\n\n";
+
+    // 1. City Network Assignment Comparison (Scale = 0.4, Demand = 5520 vph)
+    out << "City Network Assignment Comparison (Scale = 0.4, Demand = 5520 vph):\n";
+    out << std::left
+        << std::setw(12) << "Method"
+        << std::setw(8)  << "Iters"
+        << std::setw(14) << "Final RelGap"
+        << std::setw(18) << "TSTT (veh-min/h)"
+        << std::setw(16) << "TSTT (veh-hrs)"
+        << std::setw(10) << "Max V/C"
+        << "Over-Cap Edges\n";
+    out << std::string(88, '=') << "\n";
+    for (const auto& r : {aon_04, ue_msa_04, ue_fw_04, so_fw_04}) {
+        out << std::left
+            << std::setw(12) << r.method
+            << std::setw(8)  << r.iterations
+            << std::fixed << std::setprecision(6)
+            << std::setw(14) << r.final_gap
+            << std::setprecision(1)
+            << std::setw(18) << r.total_travel_time
+            << std::setprecision(2)
+            << std::setw(16) << (r.total_travel_time / 60.0)
+            << std::setprecision(3)
+            << std::setw(10) << r.max_vc
+            << r.edges_over_capacity << "\n";
+    }
+    out << std::string(88, '=') << "\n\n";
+
+    // 2. City Network Stress Test Comparison (Scale = 1.0, Demand = 13800 vph)
+    out << "City Network Stress Test Comparison (Scale = 1.0, Demand = 13800 vph):\n";
+    out << std::left
+        << std::setw(12) << "Method"
+        << std::setw(8)  << "Iters"
+        << std::setw(14) << "Final RelGap"
+        << std::setw(18) << "TSTT (veh-min/h)"
+        << std::setw(16) << "TSTT (veh-hrs)"
+        << std::setw(10) << "Max V/C"
+        << "Over-Cap Edges\n";
+    out << std::string(88, '=') << "\n";
+    for (const auto& r : {aon_10, ue_fw_10, so_fw_10}) {
+        out << std::left
+            << std::setw(12) << r.method
+            << std::setw(8)  << r.iterations
+            << std::fixed << std::setprecision(6)
+            << std::setw(14) << r.final_gap
+            << std::setprecision(1)
+            << std::setw(18) << r.total_travel_time
+            << std::setprecision(2)
+            << std::setw(16) << (r.total_travel_time / 60.0)
+            << std::setprecision(3)
+            << std::setw(10) << r.max_vc
+            << r.edges_over_capacity << "\n";
+    }
+    out << std::string(88, '=') << "\n\n";
+
+    // 3. Scenario 1 Accident Comparison
+    out << "Accident Experiment Comparison: Scenario 1 (50 Vehicles, Edge 0->13 Closed t=10 to t=25):\n";
+    out << std::left
+        << std::setw(28) << "Metric"
+        << std::setw(20) << "Rerouting OFF"
+        << std::setw(20) << "Rerouting ON" << "\n";
+    out << std::string(68, '=') << "\n";
+    out << std::left << std::setw(28) << "Completed Vehicles"
+        << std::setw(20) << acc.m_off1.completed
+        << std::setw(20) << acc.m_on1.completed << "\n";
+    out << std::left << std::setw(28) << "Failed Vehicles"
+        << std::setw(20) << acc.m_off1.failed
+        << std::setw(20) << acc.m_on1.failed << "\n";
+    out << std::fixed << std::setprecision(2);
+    out << std::left << std::setw(28) << "Average Travel Time (min)"
+        << std::setw(20) << acc.m_off1.avg_travel_time
+        << std::setw(20) << acc.m_on1.avg_travel_time << "\n";
+    out << std::left << std::setw(28) << "Max Travel Time (min)"
+        << std::setw(20) << acc.m_off1.max_travel_time
+        << std::setw(20) << acc.m_on1.max_travel_time << "\n";
+    out << std::left << std::setw(28) << "Total Wait Time (min)"
+        << std::setw(20) << acc.m_off1.total_wait
+        << std::setw(20) << acc.m_on1.total_wait << "\n";
+    out << std::string(68, '=') << "\n\n";
+
+    // 4. Scenario 2 Accident Comparison
+    out << "Accident Experiment Comparison: Scenario 2 (100 Vehicles, Edge 0->13 Closed t=5 to t=40):\n";
+    out << std::left
+        << std::setw(28) << "Metric"
+        << std::setw(20) << "Rerouting OFF"
+        << std::setw(20) << "Rerouting ON" << "\n";
+    out << std::string(68, '=') << "\n";
+    out << std::left << std::setw(28) << "Completed Vehicles"
+        << std::setw(20) << acc.m_off2.completed
+        << std::setw(20) << acc.m_on2.completed << "\n";
+    out << std::left << std::setw(28) << "Failed Vehicles"
+        << std::setw(20) << acc.m_off2.failed
+        << std::setw(20) << acc.m_on2.failed << "\n";
+    out << std::fixed << std::setprecision(2);
+    out << std::left << std::setw(28) << "Average Travel Time (min)"
+        << std::setw(20) << acc.m_off2.avg_travel_time
+        << std::setw(20) << acc.m_on2.avg_travel_time << "\n";
+    out << std::left << std::setw(28) << "Max Travel Time (min)"
+        << std::setw(20) << acc.m_off2.max_travel_time
+        << std::setw(20) << acc.m_on2.max_travel_time << "\n";
+    out << std::left << std::setw(28) << "Total Wait Time (min)"
+        << std::setw(20) << acc.m_off2.total_wait
+        << std::setw(20) << acc.m_on2.total_wait << "\n";
+    out << std::string(68, '=') << "\n\n";
+
+    // 5. Real Rerouting Trace
+    out << "Real Rerouting Trace (Scenario 2, Vehicle ID " << acc.trace.vid << "):\n";
+    out << std::string(68, '=') << "\n";
+    out << "Vehicle ID        : " << acc.trace.vid << "\n";
+    out << "Trip OD           : Node " << acc.trace.src << " (" << acc.trace.src_name << ") -> Node " << acc.trace.dst << " (" << acc.trace.dst_name << ")\n";
+    out << "Spawn Time        : " << std::fixed << std::setprecision(2) << acc.trace.spawn_time << " min\n";
+    out << "Incident Active   : Edge " << acc.trace.closed_from << " -> " << acc.trace.closed_to << " closed between t=" << acc.trace.closure_start << " min and t=" << acc.trace.closure_end << " min\n";
+    out << "Reroute Event     : Triggered at t=" << acc.trace.reroute_time << " min at Node " << acc.trace.reroute_node << " (" << acc.trace.reroute_node_name << ")\n";
+    out << "Original Route    : ";
+    for (size_t i = 0; i < acc.trace.original_route.size(); ++i) {
+        int nid = acc.trace.original_route[i];
+        std::string nname = g_net.nodes.count(nid) ? g_net.nodes.at(nid).name : std::to_string(nid);
+        out << nid << " (" << nname << ")" << (i + 1 < acc.trace.original_route.size() ? " -> " : "");
+    }
+    out << "\nDetour Route      : ";
+    for (size_t i = 0; i < acc.trace.new_route.size(); ++i) {
+        int nid = acc.trace.new_route[i];
+        std::string nname = g_net.nodes.count(nid) ? g_net.nodes.at(nid).name : std::to_string(nid);
+        out << nid << " (" << nname << ")" << (i + 1 < acc.trace.new_route.size() ? " -> " : "");
+    }
+    out << "\nFinish Time       : " << acc.trace.finish_time << " min\n";
+    out << "Total Travel Time : " << acc.trace.total_travel_time << " min\n";
+    out << "Total Wait Time   : " << acc.trace.total_wait << " min\n";
+    out << std::string(68, '=') << "\n\n";
+
+    // 6. Parallel Route-Query Scaling Benchmark
+    out << "Parallel Route-Query Scaling Benchmark (5,000 Queries):\n";
+    out << "Network 1: 15-node City Network\n";
+    out << std::left
+        << std::setw(10) << "Threads"
+        << std::setw(18) << "Elapsed (ms)"
+        << std::setw(14) << "Speedup"
+        << "Throughput (QPS)\n";
+    out << std::string(58, '-') << "\n";
+    for (const auto& run : bench.city_runs) {
+        std::ostringstream s_spd;
+        s_spd << std::fixed << std::setprecision(2) << run.speedup << "x";
+        out << std::left
+            << std::setw(10) << run.threads
+            << std::fixed << std::setprecision(2) << std::setw(18) << run.elapsed_ms
+            << std::setw(14) << s_spd.str()
+            << std::setprecision(1) << run.qps << "\n";
+    }
+    out << "\nNetwork 2: 1,600-node Synthetic Grid Network\n";
+    out << std::left
+        << std::setw(10) << "Threads"
+        << std::setw(18) << "Elapsed (ms)"
+        << std::setw(14) << "Speedup"
+        << "Throughput (QPS)\n";
+    out << std::string(58, '-') << "\n";
+    for (const auto& run : bench.grid_runs) {
+        std::ostringstream s_spd;
+        s_spd << std::fixed << std::setprecision(2) << run.speedup << "x";
+        out << std::left
+            << std::setw(10) << run.threads
+            << std::fixed << std::setprecision(2) << std::setw(18) << run.elapsed_ms
+            << std::setw(14) << s_spd.str()
+            << std::setprecision(1) << run.qps << "\n";
+    }
+    out << "\nParallel Efficiency on 4 threads: " << std::fixed << std::setprecision(1)
+        << (bench.best_grid_speedup / 4.0 * 100.0) << "% (Speedup: "
+        << std::setprecision(2) << bench.best_grid_speedup << "x)\n\n";
+
+    // 7. Test Summary
+    out << "Test Summary: " << g_tests_passed << " / " << g_tests_total << " checks passed.\n";
+
+    out.close();
+    std::cout << "[Report] Exported programmatic results summary to " << path << "\n";
+    return true;
 }
 
 // ============================================================================
@@ -1113,10 +1411,16 @@ int main()
     test_phase5_sensors_and_dropout();
     test_phase5_alert_hysteresis();
     test_phase5_threaded_demo();
-    test_phase5_accident_experiment(g4, aon_04, ue_fw_04, so_fw_04);
+    auto acc_data = test_phase5_accident_experiment(g4, aon_04, ue_fw_04, so_fw_04);
 
     // ── Phase 7 ─────────────────────────────────────────────────────────
-    TrafficParallel::run_parallel_benchmark(g4, report_check);
+    auto bench_summary = TrafficParallel::run_parallel_benchmark(g4, report_check);
+
+    // Export comprehensive results summary file for automated audit & reporting
+    save_results_summary_file("report/results_summary.txt",
+                              aon_04, ue_msa_04, ue_fw_04, so_fw_04,
+                              aon_10, ue_fw_10, so_fw_10,
+                              acc_data, bench_summary, g4);
 
     // Final Summary
     std::cout << "\n" << std::string(65, '*') << "\n";
