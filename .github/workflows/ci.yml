@@ -51,16 +51,6 @@ jobs:
         run: |
           node web/test_logic.js
 
-      - name: Configure GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: actions/configure-pages@v5
-
-      - name: Upload Web Dashboard Artifact for GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'web/'
-
       - name: Upload simulation and assignment data artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -82,6 +72,31 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download fresh simulation data from build
+        uses: actions/download-artifact@v4
+        with:
+          name: traffic-simulation-artifacts
+          path: temp_artifacts/
+
+      - name: Update web/data.js with fresh simulation output
+        run: |
+          if [ -f temp_artifacts/web/data.js ]; then
+            cp temp_artifacts/web/data.js web/data.js
+          elif [ -f temp_artifacts/data.js ]; then
+            cp temp_artifacts/data.js web/data.js
+          fi
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Web Dashboard Artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'web/'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
