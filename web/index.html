@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Flow Analysis & Simulation Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header class="dashboard-header">
+        <div class="header-brand">
+            <div class="brand-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="5" r="3"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <circle cx="6" cy="19" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.5" y1="17.5" x2="10.5" y2="13.5"></line>
+                    <line x1="15.5" y1="17.5" x2="13.5" y2="13.5"></line>
+                </svg>
+            </div>
+            <div>
+                <h1 class="brand-title">Traffic Flow Analysis & Simulation</h1>
+                <p class="brand-subtitle">Network Assignment, Dynamic Simulation & Incident Management</p>
+            </div>
+        </div>
+
+        <div class="header-actions no-print">
+            <span id="data-status-badge" class="badge badge-success">Data Loaded</span>
+            <button id="btn-download-csv" class="btn btn-secondary" title="Export current edge table to CSV">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download CSV
+            </button>
+            <button id="btn-print-report" class="btn btn-primary" title="Print dashboard report">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print Report
+            </button>
+        </div>
+    </header>
+
+    <!-- Missing Data Banner / Manual File Picker Fallback -->
+    <div id="missing-data-banner" class="banner banner-warning" style="display: none;">
+        <div class="banner-content">
+            <strong>Data Not Found (web/data.js missing):</strong>
+            <p>Run the C++ simulation engine to generate unified datasets, or manually select JSON data files below:</p>
+            <div class="file-pickers">
+                <label class="file-input-label">
+                    Load JSON Files:
+                    <input type="file" id="manual-file-input" multiple accept=".json">
+                </label>
+                <span id="manual-load-status" class="status-hint">Select network.json, assignment_result.json, sim_timeseries.json, alerts.json</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <main class="dashboard-content">
+        <!-- KPI Row -->
+        <section class="kpi-grid">
+            <div class="kpi-card" id="kpi-tstt">
+                <div class="kpi-label">Total System Travel Time (TSTT)</div>
+                <div class="kpi-value" id="val-tstt">--</div>
+                <div class="kpi-subtext" id="sub-tstt">Vehicle-Hours of travel</div>
+            </div>
+            <div class="kpi-card" id="kpi-maxvc">
+                <div class="kpi-label">Peak Volume / Capacity (V/C)</div>
+                <div class="kpi-value" id="val-maxvc">--</div>
+                <div class="kpi-subtext" id="sub-maxvc">Worst congested bottleneck</div>
+            </div>
+            <div class="kpi-card" id="kpi-overcap">
+                <div class="kpi-label">Edges Over Capacity</div>
+                <div class="kpi-value" id="val-overcap">--</div>
+                <div class="kpi-subtext">Roads operating at V/C &gt; 1.0</div>
+            </div>
+            <div class="kpi-card" id="kpi-mode">
+                <div class="kpi-label">Current View / Regime</div>
+                <div class="kpi-value" id="val-mode">User Eq.</div>
+                <div class="kpi-subtext" id="sub-mode">Equilibrium Assignment</div>
+            </div>
+        </section>
+
+        <!-- Main Workspace: Map & Controls (Left) + Sidebar (Right) -->
+        <div class="workspace-grid">
+            <!-- Left Workspace -->
+            <section class="workspace-left">
+                <!-- Toolbar: Scenario Switcher & Playback Controls -->
+                <div class="card toolbar-card no-print">
+                    <div class="toolbar-group">
+                        <label class="control-label">Traffic Assignment:</label>
+                        <div class="btn-group" role="group" aria-label="Assignment Model">
+                            <button class="btn btn-toggle active" data-scenario="UE" id="btn-scen-ue">User Equilibrium (UE)</button>
+                            <button class="btn btn-toggle" data-scenario="SO" id="btn-scen-so">System Optimal (SO)</button>
+                            <button class="btn btn-toggle" data-scenario="AON" id="btn-scen-aon">All-or-Nothing (AON)</button>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-group toolbar-playback">
+                        <label class="control-label">Dynamic Timeline:</label>
+                        <div class="playback-controls">
+                            <button id="btn-step-back" class="btn btn-icon" title="Step Back (1 min)" aria-label="Step Back">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                            </button>
+                            <button id="btn-play-pause" class="btn btn-icon btn-play" title="Play / Pause Simulation" aria-label="Play or Pause">
+                                <span id="play-icon">▶</span>
+                            </button>
+                            <button id="btn-step-fwd" class="btn btn-icon" title="Step Forward (1 min)" aria-label="Step Forward">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                            </button>
+                            <button id="btn-reset-time" class="btn btn-icon" title="Reset Timeline to Static" aria-label="Reset Time">
+                                ↺
+                            </button>
+                            <div class="slider-wrapper">
+                                <input type="range" id="time-slider" min="0" max="300" step="1" value="0" aria-label="Simulation Time Slider">
+                            </div>
+                            <span id="current-time-display" class="time-readout">Static View</span>
+                            <button id="btn-speed" class="btn btn-sm btn-outline" title="Playback Speed">1x</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Map Canvas / SVG -->
+                <div class="card map-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Network Topology & Real-Time Flow Map</h2>
+                        <div class="map-legend">
+                            <span class="legend-item"><span class="legend-dot green"></span> Free Flow (&lt; 0.6)</span>
+                            <span class="legend-item"><span class="legend-dot amber"></span> Moderate (0.6 - 0.9)</span>
+                            <span class="legend-item"><span class="legend-dot red"></span> Congested (&gt; 0.9)</span>
+                            <span class="legend-item"><span class="legend-dash grey"></span> Closed</span>
+                        </div>
+                    </div>
+
+                    <div class="map-viewport" id="map-viewport">
+                        <svg id="network-svg" class="network-svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="3" result="blur" />
+                                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                </filter>
+                                <marker id="arrow-green" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#38a169" />
+                                </marker>
+                                <marker id="arrow-amber" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#d69e2e" />
+                                </marker>
+                                <marker id="arrow-red" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#e53e3e" />
+                                </marker>
+                                <marker id="arrow-highlight" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#00e5ff" />
+                                </marker>
+                            </defs>
+                            <g id="svg-edges"></g>
+                            <g id="svg-nodes"></g>
+                        </svg>
+
+                        <!-- Floating Hover Tooltip -->
+                        <div id="map-tooltip" class="map-tooltip" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Timeseries Line Chart -->
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Network Congestion Evolution (Average V/C vs Time)</h2>
+                        <span class="chart-subtitle">Incident window: t=5 to t=40 min</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="timeseries-canvas" width="900" height="180"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Sidebar Workspace -->
+            <aside class="workspace-right">
+                <!-- Interactive Route Query Card -->
+                <div class="card route-card no-print">
+                    <div class="card-header">
+                        <h2 class="card-title">Interactive Route Navigation (Dijkstra)</h2>
+                    </div>
+                    <div class="route-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="route-src">Origin:</label>
+                                <select id="route-src" class="form-select"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="route-dst">Destination:</label>
+                                <select id="route-dst" class="form-select"></select>
+                            </div>
+                        </div>
+                        <button id="btn-find-route" class="btn btn-primary btn-block">Find Shortest Travel Time Route</button>
+                    </div>
+                    <div id="route-results" class="route-results" style="display: none;">
+                        <div class="route-summary">
+                            <span class="route-time-label">Estimated Travel Time:</span>
+                            <span id="route-time-val" class="route-time-val">--</span>
+                        </div>
+                        <div class="route-path-container">
+                            <span class="route-hops-label">Waypoints:</span>
+                            <div id="route-hops-list" class="route-hops-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottlenecks Table Card -->
+                <div class="card table-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Critical Bottlenecks (Top 10 Edges)</h2>
+                        <span class="table-instruction no-print">Click row to locate on map</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="bottleneck-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="from_name">From ⇅</th>
+                                    <th data-sort="to_name">To ⇅</th>
+                                    <th data-sort="flow">Flow ⇅</th>
+                                    <th data-sort="capacity">Cap ⇅</th>
+                                    <th data-sort="vc_ratio" class="sort-active">V/C ⇅</th>
+                                    <th data-sort="travel_time">Time (m) ⇅</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bottleneck-tbody">
+                                <!-- Populated dynamically by app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Real-Time Alerts Feed Card -->
+                <div class="card alerts-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Active Traffic Alerts & Incidents</h2>
+                        <span id="alert-count-badge" class="badge badge-info">0</span>
+                    </div>
+                    <div class="alert-filter-bar no-print">
+                        <button class="btn btn-filter active" data-filter="ALL">All</button>
+                        <button class="btn btn-filter" data-filter="CLOSURE">Closure</button>
+                        <button class="btn btn-filter" data-filter="CONGESTION">Congestion</button>
+                        <button class="btn btn-filter" data-filter="SENSOR_DROPOUT">Sensors</button>
+                    </div>
+                    <div class="alerts-feed-container" id="alerts-container">
+                        <!-- Populated dynamically by app.js -->
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Print Footer -->
+    <footer class="print-only print-footer">
+        <p>Traffic Flow Analysis System Report | MAIT CST 2nd-Year Data Structures Capstone Project</p>
+    </footer>
+
+    <!-- Scripts (Ordered: Logic -> Data -> App) -->
+    <script src="logic.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

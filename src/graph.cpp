@@ -406,3 +406,40 @@ double Graph::get_max_speed() const
     }
     return max_spd;
 }
+
+// save_network_json
+// -----------------
+// Export nodes and directed edges to network.json format for Web UI visualization.
+bool Graph::save_network_json(const std::string& filepath) const
+{
+    std::ofstream out(filepath);
+    if (!out.is_open()) return false;
+
+    out << "{\n  \"nodes\": [\n";
+    size_t n_idx = 0;
+    for (const auto& [id, node] : nodes) {
+        out << "    {\"id\": " << node.id << ", \"name\": \"" << node.name
+            << "\", \"x\": " << node.x << ", \"y\": " << node.y << "}"
+            << (n_idx + 1 < nodes.size() ? ",\n" : "\n");
+        n_idx++;
+    }
+    out << "  ],\n  \"edges\": [\n";
+
+    std::vector<Edge> all_edges;
+    for (const auto& [u, edges] : adj) {
+        (void)u;
+        for (const auto& e : edges) {
+            all_edges.push_back(e);
+        }
+    }
+    for (size_t i = 0; i < all_edges.size(); ++i) {
+        const auto& e = all_edges[i];
+        out << "    {\"from\": " << e.from << ", \"to\": " << e.to
+            << ", \"length\": " << e.length
+            << ", \"capacity\": " << e.capacity
+            << ", \"free_flow_time\": " << e.free_flow_time << "}"
+            << (i + 1 < all_edges.size() ? ",\n" : "\n");
+    }
+    out << "  ]\n}\n";
+    return true;
+}

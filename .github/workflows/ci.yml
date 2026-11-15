@@ -1,10 +1,19 @@
-name: C++ CI
+name: C++ CI and Web Dashboard Deployment
 
 on:
   push:
     branches: [ "**" ]
   pull_request:
     branches: [ "**" ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build-and-test:
@@ -14,6 +23,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Compile C++ project
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -pthread -o traffic_sim \
@@ -21,7 +35,7 @@ jobs:
             src/assignment.cpp src/alerts.cpp src/incidents.cpp \
             src/sensor_feed.cpp src/main.cpp
 
-      - name: Run C++ test suite
+      - name: Run C++ test suite and generate simulation data
         run: |
           set -o pipefail
           ./traffic_sim 2>&1 | tee output.log
@@ -33,13 +47,41 @@ jobs:
           tail -n 40 output.log
           exit $EXIT_CODE
 
+      - name: Run Web Logic Unit Tests
+        run: |
+          node web/test_logic.js
+
+      - name: Configure GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Web Dashboard Artifact for GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'web/'
+
       - name: Upload simulation and assignment data artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: traffic-simulation-artifacts
           path: |
+            data/network.json
             data/assignment_result.json
             data/alerts.json
             data/sim_timeseries.json
+            web/data.js
           if-no-files-found: warn
+
+  deploy-pages:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

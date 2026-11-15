@@ -133,6 +133,9 @@ public:
     // Time: O(E)
     double get_max_speed() const;
 
+    // Save graph network topology (nodes and edges) to JSON format
+    bool save_network_json(const std::string& filepath) const;
+
     // ── Counts ────────────────────────────────────────────────────────────────
     int node_count() const { return static_cast<int>(nodes.size()); }
     int edge_count() const;   // counts directed edges

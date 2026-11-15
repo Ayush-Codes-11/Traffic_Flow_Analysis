@@ -651,3 +651,55 @@ bool TrafficAssignment::save_to_json(
 
     return true;
 }
+
+// ── save_all_scenarios_to_json ────────────────────────────────────────────────
+bool TrafficAssignment::save_all_scenarios_to_json(
+    const Graph& /*g*/,
+    const AssignmentResult& aon,
+    const AssignmentResult& ue,
+    const AssignmentResult& so,
+    const std::string& filepath)
+{
+    std::ofstream out(filepath);
+    if (!out.is_open()) return false;
+
+    auto write_scenario = [&](const std::string& name, const AssignmentResult& res, bool is_last) {
+        out << "    \"" << name << "\": {\n";
+        out << "      \"summary\": {\n";
+        out << "        \"method\": \"" << res.method << "\",\n";
+        out << "        \"iterations\": " << res.iterations << ",\n";
+        out << "        \"final_gap\": " << std::fixed << std::setprecision(6) << res.final_gap << ",\n";
+        out << "        \"total_travel_time_veh_min\": " << std::fixed << std::setprecision(2) << res.total_travel_time << ",\n";
+        out << "        \"total_travel_time_veh_hrs\": " << std::fixed << std::setprecision(2) << (res.total_travel_time / 60.0) << ",\n";
+        out << "        \"max_vc\": " << std::fixed << std::setprecision(3) << res.max_vc << ",\n";
+        out << "        \"edges_over_capacity\": " << res.edges_over_capacity << "\n";
+        out << "      },\n";
+        out << "      \"edges\": [\n";
+        for (size_t i = 0; i < res.edge_details.size(); ++i) {
+            const auto& d = res.edge_details[i];
+            out << "        {\n";
+            out << "          \"from\": " << d.from << ",\n";
+            out << "          \"to\": " << d.to << ",\n";
+            out << "          \"from_name\": \"" << d.from_name << "\",\n";
+            out << "          \"to_name\": \"" << d.to_name << "\",\n";
+            out << "          \"flow\": " << std::fixed << std::setprecision(1) << d.flow << ",\n";
+            out << "          \"capacity\": " << std::fixed << std::setprecision(1) << d.capacity << ",\n";
+            out << "          \"free_flow_time\": " << std::fixed << std::setprecision(2) << d.free_flow_time << ",\n";
+            out << "          \"travel_time\": " << std::fixed << std::setprecision(3) << d.travel_time << ",\n";
+            out << "          \"vc_ratio\": " << std::fixed << std::setprecision(3) << d.vc_ratio << "\n";
+            out << "        }" << (i + 1 < res.edge_details.size() ? ",\n" : "\n");
+        }
+        out << "      ]\n";
+        out << "    }" << (is_last ? "\n" : ",\n");
+    };
+
+    out << "{\n";
+    out << "  \"scenarios\": {\n";
+    write_scenario("AON", aon, false);
+    write_scenario("UE", ue, false);
+    write_scenario("SO", so, true);
+    out << "  }\n";
+    out << "}\n";
+
+    return true;
+}

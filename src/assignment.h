@@ -155,6 +155,13 @@ public:
                              const AssignmentResult& res,
                              const std::string& filepath);
 
+    // Export all three assignment scenarios (AON, UE, SO) to a unified JSON file for the UI.
+    static bool save_all_scenarios_to_json(const Graph& g,
+                                           const AssignmentResult& aon,
+                                           const AssignmentResult& ue,
+                                           const AssignmentResult& so,
+                                           const std::string& filepath);
+
     // Calculate Total System Travel Time: sum over all edges of (flow * bpr_time(flow))
     static double compute_tstt(const Graph& g,
                                const std::map<std::pair<int, int>, double>& flows);
