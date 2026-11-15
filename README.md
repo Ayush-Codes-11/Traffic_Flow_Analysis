@@ -134,11 +134,17 @@ Because the C++ engine generates `web/data.js` containing `window.TRAFFIC_DATA =
 
 The web dashboard provides interactive visualization for network topology, traffic equilibrium, bottleneck identification, dynamic incident alerts, and time-series V/C playback.
 
-> [!NOTE]
-> Screenshot assets (`docs/screenshots/map.png`, `docs/screenshots/bottlenecks.png`, and `docs/screenshots/alerts.png`) will be added to illustrate the live interface:
-> - **`docs/screenshots/map.png`**: Interactive SVG network topology with color-coded V/C ratios, parallel opposing lanes, and live hover tooltips.
-> - **`docs/screenshots/bottlenecks.png`**: Sortable bottleneck ranking table and canvas time-series V/C scrubber.
-> - **`docs/screenshots/alerts.png`**: Real-time incident alert feed and interactive Dijkstra path navigator.
+### 1. Network Topology & Real-Time Flow Map
+Interactive SVG network topology with color-coded V/C ratios, parallel opposing lanes, and directional flow vectors:
+![Network Topology Map](docs/screenshots/map.png)
+
+### 2. Critical Bottlenecks (Top 10 Edges)
+Sortable link table highlighting congested corridors operating above design capacity ($V/C > 1.0$):
+![Critical Bottlenecks](docs/screenshots/bottlenecks.png)
+
+### 3. Active Incident & Congestion Alerts
+Real-time incident management feed displaying road closures and automated system alerts:
+![Active Traffic Alerts](docs/screenshots/alerts.png)
 
 ### Live Dashboard Access
 - **Production URL**: **[https://ayush-codes-11.github.io/Traffic_Flow_Analysis/](https://ayush-codes-11.github.io/Traffic_Flow_Analysis/)**
