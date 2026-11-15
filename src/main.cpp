@@ -848,13 +848,107 @@ struct RerouteTrace {
     double total_wait = 0.0;
 };
 
+struct EdgeEntryCount {
+    int from;
+    int to;
+    std::string from_name;
+    std::string to_name;
+    int entries;
+};
+
+struct ScenarioGroundedStats {
+    int rerouted_count = 0;
+    int affected_completed = 0;
+    double affected_avg_travel_time = 0.0;
+    int unaffected_completed = 0;
+    double unaffected_avg_travel_time = 0.0;
+    std::vector<EdgeEntryCount> top_10_edges;
+};
+
 struct AccidentExperimentData {
     Simulation::RunMetrics m_off1;
     Simulation::RunMetrics m_on1;
     Simulation::RunMetrics m_off2;
     Simulation::RunMetrics m_on2;
     RerouteTrace trace;
+    ScenarioGroundedStats stats_off1;
+    ScenarioGroundedStats stats_on1;
+    ScenarioGroundedStats stats_off2;
+    ScenarioGroundedStats stats_on2;
 };
+
+static ScenarioGroundedStats compute_grounded_stats(
+    const Simulation& sim,
+    double t_start,
+    double t_end,
+    const Graph& g)
+{
+    ScenarioGroundedStats stats;
+    double affected_sum = 0.0;
+    double unaffected_sum = 0.0;
+
+    for (const auto& v : sim.get_vehicles()) {
+        if (v.was_rerouted) {
+            stats.rerouted_count++;
+        }
+        if (v.completed && v.finish_time >= 0.0) {
+            bool planned_uses_0_13 = false;
+            for (size_t i = 0; i + 1 < v.original_route.size(); ++i) {
+                if (v.original_route[i] == 0 && v.original_route[i+1] == 13) {
+                    planned_uses_0_13 = true;
+                    break;
+                }
+            }
+            double tt = v.finish_time - v.entry_time;
+            if (planned_uses_0_13) {
+                stats.affected_completed++;
+                affected_sum += tt;
+            } else {
+                stats.unaffected_completed++;
+                unaffected_sum += tt;
+            }
+        }
+    }
+
+    if (stats.affected_completed > 0) {
+        stats.affected_avg_travel_time = affected_sum / stats.affected_completed;
+    }
+    if (stats.unaffected_completed > 0) {
+        stats.unaffected_avg_travel_time = unaffected_sum / stats.unaffected_completed;
+    }
+
+    std::vector<EdgeEntryCount> edge_counts;
+    for (const auto& pair : g.adj) {
+        int from = pair.first;
+        for (const auto& edge : pair.second) {
+            int to = edge.to;
+            const auto& entries = sim.get_edge_entries(from, to);
+            int cnt = 0;
+            for (const auto& ep : entries) {
+                if (ep.second >= t_start && ep.second <= t_end) {
+                    cnt++;
+                }
+            }
+            if (cnt > 0) {
+                std::string fn = g.nodes.count(from) ? g.nodes.at(from).name : std::to_string(from);
+                std::string tn = g.nodes.count(to) ? g.nodes.at(to).name : std::to_string(to);
+                edge_counts.push_back({from, to, fn, tn, cnt});
+            }
+        }
+    }
+
+    std::sort(edge_counts.begin(), edge_counts.end(), [](const EdgeEntryCount& a, const EdgeEntryCount& b) {
+        if (a.entries != b.entries) return a.entries > b.entries;
+        if (a.from != b.from) return a.from < b.from;
+        return a.to < b.to;
+    });
+
+    for (size_t i = 0; i < edge_counts.size() && i < 10; ++i) {
+        stats.top_10_edges.push_back(edge_counts[i]);
+    }
+
+    return stats;
+}
 
 static AccidentExperimentData test_phase5_accident_experiment(
     const Graph& g_net,
@@ -1011,19 +1105,10 @@ static AccidentExperimentData test_phase5_accident_experiment(
               << std::setw(20) << m_on2.total_wait << "\n";
     std::cout << std::string(68, '=') << "\n";
 
-    // Theoretical analysis of Scenario 2:
-    // When 100 vehicles traverse the network during a 35-minute closure,
-    // rerouted vehicles divert onto alternative side roads. Under heavy flow,
-    // these detour roads experience secondary congestion transfer onto lower-capacity side roads
-    // (capacities 1,200–1,600 vph vs 2,000 vph on the arterial).
-    // While rerouting prevents vehicle stranding and caps maximum individual delay,
-    // detour travel times on saturated side roads can equal or exceed waiting for the arterial to reopen.
-    std::cout << "\n[Traffic Engineering Note - Scenario 2 Rerouting Dynamics]:\n"
-              << "  Under prolonged arterial closures (t=5..40) with 100 vehicles, diverted traffic\n"
-              << "  loads secondary detour corridors (e.g. Nodes 4, 10, 2, 3), causing localized queue\n"
-              << "  delays due to secondary congestion transfer onto lower-capacity side roads\n"
-              << "  (side road capacities 1,200-1,600 vph vs 2,000 vph on the closed arterial).\n"
-              << "  Rerouting effectively prevents queue starvation and caps maximum individual delay.\n";
+    // Traffic Engineering Note - Grounded in empirical simulation results:
+    std::cout << "\n[Traffic Engineering Note - Scenario Rerouting Dynamics]:\n"
+              << "  Rerouting reduced worst-case delay and total wait; average travel time\n"
+              << "  improved in Scenario 2 and stayed the same in Scenario 1.\n";
 
     // Export alerts and timeseries from sim_on2 for Phase 6 UI
     sim_on2.get_alert_manager().save_alerts_to_json("data/alerts.json");
@@ -1037,6 +1122,31 @@ static AccidentExperimentData test_phase5_accident_experiment(
     exp_data.m_on1 = m_on1;
     exp_data.m_off2 = m_off2;
     exp_data.m_on2 = m_on2;
+
+    exp_data.stats_off1 = compute_grounded_stats(sim_off1, 10.0, 25.0, g_net);
+    exp_data.stats_on1  = compute_grounded_stats(sim_on1, 10.0, 25.0, g_net);
+    exp_data.stats_off2 = compute_grounded_stats(sim_off2, 5.0, 40.0, g_net);
+    exp_data.stats_on2  = compute_grounded_stats(sim_on2, 5.0, 40.0, g_net);
+
+    std::cout << "\nScenario 1 Grounded Diagnostics (t=10 to t=25 min):\n"
+              << "  Vehicles Rerouted: OFF=" << exp_data.stats_off1.rerouted_count
+              << " | ON=" << exp_data.stats_on1.rerouted_count << "\n"
+              << "  Affected (Planned 0->13): Count=" << exp_data.stats_on1.affected_completed
+              << " | Avg Travel Time: OFF=" << exp_data.stats_off1.affected_avg_travel_time
+              << "m | ON=" << exp_data.stats_on1.affected_avg_travel_time << "m\n"
+              << "  Unaffected: Count=" << exp_data.stats_on1.unaffected_completed
+              << " | Avg Travel Time: OFF=" << exp_data.stats_off1.unaffected_avg_travel_time
+              << "m | ON=" << exp_data.stats_on1.unaffected_avg_travel_time << "m\n";
+
+    std::cout << "\nScenario 2 Grounded Diagnostics (t=5 to t=40 min):\n"
+              << "  Vehicles Rerouted: OFF=" << exp_data.stats_off2.rerouted_count
+              << " | ON=" << exp_data.stats_on2.rerouted_count << "\n"
+              << "  Affected (Planned 0->13): Count=" << exp_data.stats_on2.affected_completed
+              << " | Avg Travel Time: OFF=" << exp_data.stats_off2.affected_avg_travel_time
+              << "m | ON=" << exp_data.stats_on2.affected_avg_travel_time << "m\n"
+              << "  Unaffected: Count=" << exp_data.stats_on2.unaffected_completed
+              << " | Avg Travel Time: OFF=" << exp_data.stats_off2.unaffected_avg_travel_time
+              << "m | ON=" << exp_data.stats_on2.unaffected_avg_travel_time << "m\n";
 
     // Extract real rerouting trace from the first completed rerouted vehicle in Scenario 2
     for (const auto& v : sim_on2.get_vehicles()) {
@@ -1158,6 +1268,32 @@ static bool save_results_summary_file(
     }
     out << std::string(88, '=') << "\n\n";
 
+    // 1b. Edge 0->5 Flow and V/C Verification (Central_Station -> Business_District, Cap = 2000 vph)
+    out << "Edge 0->5 (Central_Station -> Business_District, Capacity = 2000.0 vph) Flow & V/C Details:\n";
+    out << std::left
+        << std::setw(12) << "Method"
+        << std::setw(16) << "Flow (vph)"
+        << std::setw(18) << "Capacity (vph)"
+        << std::setw(14) << "V/C Ratio"
+        << "Bottleneck State\n";
+    out << std::string(74, '-') << "\n";
+    auto print_05_row = [&](std::ostream& os, const std::string& meth, const AssignmentResult& r) {
+        double f = r.flows.count({0, 5}) ? r.flows.at({0, 5}) : 0.0;
+        double c = 2000.0;
+        double vc = (c > 0) ? (f / c) : 0.0;
+        os << std::left
+           << std::setw(12) << meth
+           << std::fixed << std::setprecision(1) << std::setw(16) << f
+           << std::setw(18) << c
+           << std::setprecision(3) << std::setw(14) << vc
+           << (vc > 1.0 ? "OVER CAPACITY (Bottleneck)" : "Under Capacity") << "\n";
+    };
+    print_05_row(out, "AON", aon_04);
+    print_05_row(out, "UE_MSA", ue_msa_04);
+    print_05_row(out, "UE_FW", ue_fw_04);
+    print_05_row(out, "SO_FW", so_fw_04);
+    out << std::string(74, '-') << "\n\n";
+
     // 2. City Network Stress Test Comparison (Scale = 1.0, Demand = 13800 vph)
     out << "City Network Stress Test Comparison (Scale = 1.0, Demand = 13800 vph):\n";
     out << std::left
@@ -1210,6 +1346,41 @@ static bool save_results_summary_file(
         << std::setw(20) << acc.m_on1.total_wait << "\n";
     out << std::string(68, '=') << "\n\n";
 
+    // 3b. Scenario 1 Grounded Diagnostics
+    out << "Scenario 1 Grounded Diagnostics (Edge 0->13 Closed t=10 to t=25 min):\n";
+    out << "  Vehicles with Route Changed   : Rerouting OFF = " << acc.stats_off1.rerouted_count
+        << " | Rerouting ON = " << acc.stats_on1.rerouted_count << "\n";
+    out << "  Affected Vehicles (Planned Route Used Edge 0->13):\n";
+    out << "    Completed Count             : Rerouting OFF = " << acc.stats_off1.affected_completed
+        << " | Rerouting ON = " << acc.stats_on1.affected_completed << "\n";
+    out << "    Average Travel Time (min)   : Rerouting OFF = " << std::fixed << std::setprecision(2) << acc.stats_off1.affected_avg_travel_time
+        << " | Rerouting ON = " << acc.stats_on1.affected_avg_travel_time << "\n";
+    out << "  Unaffected Vehicles (Planned Route Did Not Use Edge 0->13):\n";
+    out << "    Completed Count             : Rerouting OFF = " << acc.stats_off1.unaffected_completed
+        << " | Rerouting ON = " << acc.stats_on1.unaffected_completed << "\n";
+    out << "    Average Travel Time (min)   : Rerouting OFF = " << std::fixed << std::setprecision(2) << acc.stats_off1.unaffected_avg_travel_time
+        << " | Rerouting ON = " << acc.stats_on1.unaffected_avg_travel_time << "\n\n";
+    out << "  Top 10 Busiest Edges during Closure Window [10.0, 25.0] min (Rerouting ON):\n";
+    out << "    Rank  Edge      Edge Name                           Entries (ON)  Entries (OFF)\n";
+    out << "    " << std::string(68, '-') << "\n";
+    for (size_t i = 0; i < acc.stats_on1.top_10_edges.size(); ++i) {
+        const auto& e_on = acc.stats_on1.top_10_edges[i];
+        int off_entries = 0;
+        for (const auto& e_off : acc.stats_off1.top_10_edges) {
+            if (e_off.from == e_on.from && e_off.to == e_on.to) {
+                off_entries = e_off.entries;
+                break;
+            }
+        }
+        std::string ename = e_on.from_name + " -> " + e_on.to_name;
+        out << "    " << std::left << std::setw(6) << (i + 1)
+            << std::setw(10) << (std::to_string(e_on.from) + "->" + std::to_string(e_on.to))
+            << std::setw(36) << ename
+            << std::setw(14) << e_on.entries
+            << off_entries << "\n";
+    }
+    out << "\n";
+
     // 4. Scenario 2 Accident Comparison
     out << "Accident Experiment Comparison: Scenario 2 (100 Vehicles, Edge 0->13 Closed t=5 to t=40):\n";
     out << std::left
@@ -1234,6 +1405,41 @@ static bool save_results_summary_file(
         << std::setw(20) << acc.m_off2.total_wait
         << std::setw(20) << acc.m_on2.total_wait << "\n";
     out << std::string(68, '=') << "\n\n";
+
+    // 4b. Scenario 2 Grounded Diagnostics
+    out << "Scenario 2 Grounded Diagnostics (Edge 0->13 Closed t=5 to t=40 min):\n";
+    out << "  Vehicles with Route Changed   : Rerouting OFF = " << acc.stats_off2.rerouted_count
+        << " | Rerouting ON = " << acc.stats_on2.rerouted_count << "\n";
+    out << "  Affected Vehicles (Planned Route Used Edge 0->13):\n";
+    out << "    Completed Count             : Rerouting OFF = " << acc.stats_off2.affected_completed
+        << " | Rerouting ON = " << acc.stats_on2.affected_completed << "\n";
+    out << "    Average Travel Time (min)   : Rerouting OFF = " << std::fixed << std::setprecision(2) << acc.stats_off2.affected_avg_travel_time
+        << " | Rerouting ON = " << acc.stats_on2.affected_avg_travel_time << "\n";
+    out << "  Unaffected Vehicles (Planned Route Did Not Use Edge 0->13):\n";
+    out << "    Completed Count             : Rerouting OFF = " << acc.stats_off2.unaffected_completed
+        << " | Rerouting ON = " << acc.stats_on2.unaffected_completed << "\n";
+    out << "    Average Travel Time (min)   : Rerouting OFF = " << std::fixed << std::setprecision(2) << acc.stats_off2.unaffected_avg_travel_time
+        << " | Rerouting ON = " << acc.stats_on2.unaffected_avg_travel_time << "\n\n";
+    out << "  Top 10 Busiest Edges during Closure Window [5.0, 40.0] min (Rerouting ON):\n";
+    out << "    Rank  Edge      Edge Name                           Entries (ON)  Entries (OFF)\n";
+    out << "    " << std::string(68, '-') << "\n";
+    for (size_t i = 0; i < acc.stats_on2.top_10_edges.size(); ++i) {
+        const auto& e_on = acc.stats_on2.top_10_edges[i];
+        int off_entries = 0;
+        for (const auto& e_off : acc.stats_off2.top_10_edges) {
+            if (e_off.from == e_on.from && e_off.to == e_on.to) {
+                off_entries = e_off.entries;
+                break;
+            }
+        }
+        std::string ename = e_on.from_name + " -> " + e_on.to_name;
+        out << "    " << std::left << std::setw(6) << (i + 1)
+            << std::setw(10) << (std::to_string(e_on.from) + "->" + std::to_string(e_on.to))
+            << std::setw(36) << ename
+            << std::setw(14) << e_on.entries
+            << off_entries << "\n";
+    }
+    out << "\n";
 
     // 5. Real Rerouting Trace
     out << "Real Rerouting Trace (Scenario 2, Vehicle ID " << acc.trace.vid << "):\n";

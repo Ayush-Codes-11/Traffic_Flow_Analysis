@@ -130,18 +130,19 @@ Because the C++ engine generates `web/data.js` containing `window.TRAFFIC_DATA =
 
 ---
 
-## 5. Visual Dashboard Features & Screenshots
+## 5. Visual Dashboard Screenshots
 
 The web dashboard provides interactive visualization for network topology, traffic equilibrium, bottleneck identification, dynamic incident alerts, and time-series V/C playback.
 
-### Screenshots
-- **Network Topology Map**: [docs/screenshots/map.png](docs/screenshots/map.png) — Interactive SVG road network visualization with color-coded V/C ratios, bidirectional parallel lane offset, and live hover tooltips displaying flow, capacity, V/C, and BPR delay.
-- **Bottleneck Analysis & Table**: [docs/screenshots/bottlenecks.png](docs/screenshots/bottlenecks.png) — Real-time ranking of network bottlenecks with interactive link selection and canvas V/C timeline scrubber synchronized to the road network.
-- **Active Alerts & Route Navigator**: [docs/screenshots/alerts.png](docs/screenshots/alerts.png) — Dynamic incident alerts (closures, congestion hysteresis) and interactive Dijkstra origin-destination pathfinder.
+> [!NOTE]
+> Screenshot assets (`docs/screenshots/map.png`, `docs/screenshots/bottlenecks.png`, and `docs/screenshots/alerts.png`) will be added to illustrate the live interface:
+> - **`docs/screenshots/map.png`**: Interactive SVG network topology with color-coded V/C ratios, parallel opposing lanes, and live hover tooltips.
+> - **`docs/screenshots/bottlenecks.png`**: Sortable bottleneck ranking table and canvas time-series V/C scrubber.
+> - **`docs/screenshots/alerts.png`**: Real-time incident alert feed and interactive Dijkstra path navigator.
 
-### How to View the Dashboard
-- **Live Production Deployment**: Visit **[https://ayush-codes-11.github.io/Traffic_Flow_Analysis/](https://ayush-codes-11.github.io/Traffic_Flow_Analysis/)**
-- **Local Execution**: Double-click `web/index.html` in your file manager to open it in any modern browser (`Chrome`, `Firefox`, `Edge`, `Safari`) without needing a web server. All simulation outputs and topologies are loaded directly from `web/data.js`.
+### Live Dashboard Access
+- **Production URL**: **[https://ayush-codes-11.github.io/Traffic_Flow_Analysis/](https://ayush-codes-11.github.io/Traffic_Flow_Analysis/)**
+- **Local Browser**: Double-click `web/index.html` to run locally without a web server (all simulation results load directly from `web/data.js`).
 
 ---
 

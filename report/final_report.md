@@ -1,4 +1,4 @@
-# Traffic Flow Analysis & Simulation System
+﻿# Traffic Flow Analysis & Simulation System
 ## Academic Capstone Project Report Outline
 **Course:** Data Structures & Algorithms (B.Tech 2nd Year, Computer Science & Technology)  
 **Institution:** Maharaja Agrasen Institute of Technology (MAIT), GGSIPU  
@@ -88,7 +88,16 @@ Evaluated on the 15-node city network at standard scale factor $0.4$ (Total Netw
 
 #### Engineering Findings:
 1. **Wardrop’s Principle Verified:** System Optimal achieves the minimum Total System Travel Time ($1,277.80$ veh-hrs at scale 0.4), saving **$14.07$ vehicle-hours per hour** compared to User Equilibrium ($1,291.87$ veh-hrs).
-2. **Bottleneck Elimination:** Under UE (Frank-Wolfe, scale 0.4), the single over-capacity link is **Edge 0→5 (Central_Station → Business_District)** with an assigned flow of $2,082$ vph against a design capacity of $2,000$ vph (Peak V/C = $1.041$). Under System Optimal, marginal social cost pricing shifts traffic onto alternative routes, reducing flow on Edge 0→5 to $1,570$ vph (V/C = $0.785$) and eliminating all over-capacity bottlenecks network-wide.
+2. **Bottleneck Elimination:** Under UE (Frank-Wolfe, scale 0.4), the single over-capacity link is **Edge 0→5 (Central_Station → Business_District)** with an assigned flow of $2,081.6$ vph against a design capacity of $2,000.0$ vph (Peak V/C = $1.041$). Under System Optimal, marginal social cost pricing shifts traffic onto alternative routes, reducing flow on Edge 0→5 down to $1,570.4$ vph (V/C = $0.785$) and eliminating all over-capacity bottlenecks network-wide:
+
+##### Edge 0→5 (Central_Station → Business_District, Capacity = 2,000.0 vph) Link Telemetry:
+| Method | Flow (vph) | Capacity (vph) | V/C Ratio | Bottleneck Status |
+| :--- | :---: | :---: | :---: | :--- |
+| **All-or-Nothing (AON)** | $2,400.0$ | $2,000.0$ | $1.200$ | OVER CAPACITY (Bottleneck) |
+| **User Equilibrium (MSA)** | $2,040.0$ | $2,000.0$ | $1.020$ | OVER CAPACITY (Bottleneck) |
+| **User Equilibrium (Frank-Wolfe)** | $2,081.6$ | $2,000.0$ | $1.041$ | OVER CAPACITY (Bottleneck) |
+| **System Optimal (Frank-Wolfe)** | $1,570.4$ | $2,000.0$ | $0.785$ | Under Capacity (Optimal) |
+
 3. **Frank-Wolfe Efficiency:** Frank-Wolfe UE achieves convergence ($\text{RelGap} < 10^{-3}$) in only **3 iterations**, whereas MSA required **7 iterations**, confirming the mathematical advantage of line search over harmonic step sizing. Under stress testing (13,800 vph), Frank-Wolfe UE converged in 228 iterations while cutting total system delay from $11,996.94$ veh-hrs (AON) down to $4,718.01$ veh-hrs ($-60.7\%$).
 
 ---
@@ -104,6 +113,20 @@ Evaluated under deterministic random seeds on the 15-node, 50-directed-edge city
   - Maximum Individual Travel Time: Reduced from **$35.64$ min** down to **$32.97$ min** ($-7.5\%$).
   - Total Queue Wait Time: Reduced from **$272.67$ min** down to **$258.47$ min** ($-5.2\%$).
 
+##### Top 10 Busiest Edges during Closure Window ($t = 10.0 \dots 25.0$ min):
+| Rank | Edge | Edge Description | Entries (Rerouting ON) | Entries (Rerouting OFF) | Telemetry Observation |
+| :---: | :---: | :--- | :---: | :---: | :--- |
+| 1 | 6→12 | City_Park → Stadium | 5 | 3 | Alternative eastern transit path |
+| 2 | 0→4 | Central_Station → Shopping_Mall | 4 | 0 | Traffic diverted away from closed arterial 0→13 |
+| 3 | 0→6 | Central_Station → City_Park | 4 | 4 | Stable primary egress corridor |
+| 4 | 12→4 | Stadium → Shopping_Mall | 4 | 0 | Diversion path connecting stadium to shopping mall |
+| 5 | 5→0 | Business_District → Central_Station | 3 | 3 | Inbound commute unaffected |
+| 6 | 9→6 | South_Suburb → City_Park | 3 | 3 | South-to-center transit unaffected |
+| 7 | 14→6 | Industrial_Zone → City_Park | 3 | 3 | Industrial freight transit unaffected |
+| 8 | 2→13 | University → Old_Market | 2 | 2 | Northern market access unaffected |
+| 9 | 4→2 | Shopping_Mall → University | 2 | 2 | Secondary cross-link unaffected |
+| 10 | 4→12 | Shopping_Mall → Stadium | 2 | 2 | Cross-town route unaffected |
+
 #### Scenario 2: Heavy Load & Sustained Closure (100 Vehicles, Edge 0→13 Closed $t = 5 \dots 40$ min)
 - **Closure Window:** 35 minutes across the primary arterial corridor (Central Station $\to$ Old Market).
 - **Results:**
@@ -112,16 +135,34 @@ Evaluated under deterministic random seeds on the 15-node, 50-directed-edge city
   - Maximum Individual Travel Time: Reduced from **$48.97$ min** down to **$34.79$ min** (**$-28.9\%$**).
   - Total Queue Wait Time: Reduced from **$542.89$ min** down to **$486.29$ min** (**$-10.4\%$**).
 
-#### Engineering Analysis & Secondary Congestion Transfer:
-- In Scenario 2, rerouting vehicles around the closed arterial (Edge 0→13, capacity $2,000$ vph) diverted flow onto secondary corridors (e.g., via Nodes 4, 10, 2, and 7).
-- Inspection of `data/sample_city.json` confirms that these secondary detour roads have strictly lower design capacities ($1,200\text{--}1,800$ vph vs $2,000$ vph on arterial 0→13):
-  - Edge 0→4 (Shopping Mall): capacity **$1,800$ vph**
-  - Edge 4→2 (University): capacity **$1,600$ vph**
-  - Edge 2→13 (Old Market): capacity **$1,600$ vph**
-  - Edge 2→7 (North Suburb): capacity **$1,200$ vph**
-  - Edge 7→13 (Old Market): capacity **$1,200$ vph**
-- Under heavy demand (100 vehicles), this diverted volume causes **secondary congestion transfer** onto these narrower side roads. 
-- However, dynamic A* rerouting successfully prevented localized gridlock, capped the maximum individual delay from $48.97$ min to $34.79$ min, and eliminated stranded queues.
+##### Top 10 Busiest Edges during Closure Window ($t = 5.0 \dots 40.0$ min):
+| Rank | Edge | Edge Description | Entries (Rerouting ON) | Entries (Rerouting OFF) | Telemetry Observation |
+| :---: | :---: | :--- | :---: | :---: | :--- |
+| 1 | 2→13 | University → Old_Market | 8 | 8 | Northern market ingress corridor |
+| 2 | 4→2 | Shopping_Mall → University | 7 | 6 | Secondary link serving detoured trips |
+| 3 | 0→4 | Central_Station → Shopping_Mall | 6 | 0 | Primary detour away from closed arterial 0→13 |
+| 4 | 5→0 | Business_District → Central_Station | 6 | 7 | Inbound business traffic |
+| 5 | 6→12 | City_Park → Stadium | 6 | 5 | Alternative bypass corridor |
+| 6 | 12→6 | Stadium → City_Park | 6 | 6 | Return bypass corridor |
+| 7 | 13→0 | Old_Market → Central_Station | 6 | 6 | Reverse arterial unaffected |
+| 8 | 6→9 | City_Park → South_Suburb | 5 | 5 | Outbound suburban transit |
+| 9 | 10→4 | West_Suburb → Shopping_Mall | 5 | 5 | Suburban feeder corridor |
+| 10 | 11→5 | Tech_Park → Business_District | 5 | 5 | Tech park commuter flow |
+
+#### Engineering Analysis of Rerouting Dynamics (Grounded in Empirical Telemetry):
+- **Grounded Empirical Finding:** Rerouting reduced worst-case delay and total wait; average travel time improved in Scenario 2 ($14.83 \to 14.35$ min) and stayed the same in Scenario 1 ($15.09 \to 15.09$ min).
+- **Why Average Travel Time Improves Little in Scenario 1:** 
+  The telemetry decomposition in `results_summary.txt` explains this phenomenon:
+  - In Scenario 1, only **11 out of 50 vehicles** planned trips using Edge 0→13. 
+  - The **39 unaffected vehicles** had nearly identical travel times (**$12.78$ min** OFF vs **$12.79$ min** ON).
+  - The **11 affected vehicles** averaged **$23.31$ min** OFF vs **$23.24$ min** ON.
+  - Averaged across all 50 vehicles, the benefit is diluted across the majority unaffected population, resulting in a rounded network average of **$15.09$ min** in both modes.
+- **Why Scenario 2 Shows Measurable Average Improvement ($14.83 \to 14.35$ min):**
+  - In Scenario 2, closure was active for 35 minutes ($t=5 \dots 40$ min).
+  - The **8 affected vehicles** had their average travel time slashed from **$30.20$ min** down to **$24.20$ min** (**$-6.00$ min / $-19.9\%$** reduction per affected vehicle).
+  - The **92 unaffected vehicles** remained constant (**$13.49$ min** OFF vs **$13.50$ min** ON).
+  - This 6-minute concentrated benefit across 8 vehicles lowers the overall network-wide average from $14.83$ min to $14.35$ min.
+- **Why Maximum Individual Delay Improves Significantly:** Without dynamic rerouting, vehicles arriving at the closed edge must wait idly in the physical edge queue for the entire remainder of the closure window (up to 15 minutes in Scenario 1 and up to 35 minutes in Scenario 2) before the road reopens. Dynamic A* rerouting immediately detects the closure and dispatches vehicles onto open alternative corridors, capping the worst-case individual delay from $35.64$ min down to $32.97$ min in Scenario 1 ($-7.5\%$) and from $48.97$ min down to $34.79$ min in Scenario 2 ($-28.9\%$).
 
 #### Worked Example: Real Dynamic Rerouting Trace (Scenario 2)
 The discrete-event simulation engine logs real vehicle trajectory traces during execution. The following trace represents the first completed rerouted vehicle in Scenario 2 as recorded directly by the C++ engine:
@@ -151,16 +192,16 @@ The discrete-event simulation engine logs real vehicle trajectory traces during 
 Evaluated across 5,000 random origin-destination queries using `std::thread` data-parallel partitioning:
 
 #### Part A: 15-Node City Network
-- **1 Thread:** $9.57$ ms ($522,613$ queries/sec)
-- **2 Threads:** $10.21$ ms ($0.98\times$ speedup)
-- **4 Threads:** $6.93$ ms ($1.44\times$ speedup, $721,267$ queries/sec)
+- **1 Thread:** $7.34$ ms ($681,431$ queries/sec)
+- **2 Threads:** $4.64$ ms ($1.68\times$ speedup)
+- **4 Threads:** $3.46$ ms ($2.25\times$ speedup, $1,446,386$ queries/sec)
 - **Analysis:** Individual Dijkstra queries on a 15-node graph execute in $\sim 1\text{--}3$ microseconds. Thread invocation overhead, cache migration, and thread synchronization account for a noticeable fraction of total runtime on small networks. All parallel query path costs matched sequential results with $100\%$ precision.
 
 #### Part B: Synthetic 40x40 Grid Network (1,600 Nodes, 6,240 Edges)
-- **1 Thread:** $1,367.59$ ms ($3,656$ queries/sec)
-- **2 Threads:** $686.13$ ms ($2.00\times$ speedup)
-- **4 Threads:** $591.21$ ms ($2.32\times$ speedup, $8,457$ queries/sec)
-- **Analysis:** With 1,600 nodes, each path search explores hundreds of heap nodes ($\sim 100\text{--}300\ \mu\text{s}$ per query). Computation heavily dominates thread dispatch, achieving a measured speedup of **$2.32\times$ on 4 threads** (parallel efficiency: **$57.9\% = 2.32 / 4 \times 100\%$**) on shared virtualized CI runners. All 5,000 path costs produced by parallel thread pools matched the sequential baseline exactly, verifying algorithmic equivalence.
+- **1 Thread:** $1,203.36$ ms ($4,155$ queries/sec)
+- **2 Threads:** $622.26$ ms ($1.96\times$ speedup)
+- **4 Threads:** $429.76$ ms ($2.84\times$ speedup, $11,634$ queries/sec)
+- **Analysis:** With 1,600 nodes, each path search explores hundreds of heap nodes ($\sim 100\text{--}300\ \mu\text{s}$ per query). Computation heavily dominates thread dispatch, achieving a measured speedup of **$2.84\times$ on 4 threads** (parallel efficiency: **$70.9\% = 2.84 / 4 \times 100\%$**) on Ubuntu Linux runners. All 5,000 path costs produced by parallel thread pools matched the sequential baseline exactly, verifying algorithmic equivalence.
 
 ---
 
