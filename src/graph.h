@@ -122,6 +122,12 @@ public:
     // Close / reopen a road segment.  Time: O(degree(from))
     bool set_closed(int from, int to, bool closed);
 
+    // Update capacity on directed edge from→to.  Time: O(degree(from))
+    bool set_capacity(int from, int to, double new_capacity);
+
+    // Get capacity on directed edge from→to. Returns -1.0 if not found. Time: O(degree(from))
+    double get_capacity(int from, int to) const;
+
     // Maximum speed over all edges (euclidean_dist / free_flow_time).
     // Used by A* heuristic to guarantee admissibility (never overestimating).
     // Time: O(E)

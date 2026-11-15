@@ -1,0 +1,19 @@
+# External traffic sensor telemetry feed
+# Format: timestamp,from,to,vehicle_count,avg_speed
+timestamp,from,to,vehicle_count,avg_speed
+0.0,0,13,1250.5,48.2
+0.5,0,13,1310.0,46.5
+1.0,0,13,1295.2,47.0
+1.0,13,0,1100.0,52.1
+1.5,0,13,1420.0,43.8
+# Deliberately malformed line 1: missing speed column
+2.0,0,13,1500.0
+# Deliberately malformed line 2: non-numeric flow
+2.0,13,0,CORRUPT_DATA,50.0
+2.0,0,13,1480.0,42.5
+2.5,0,13,1520.0,41.0
+3.0,0,13,1600.0,38.5
+# Deliberately malformed line 3: negative node ID
+3.5,-5,13,1200.0,45.0
+3.5,0,13,1550.0,40.2
+4.0,0,13,1490.0,41.8

@@ -1,6 +1,6 @@
 // =============================================================================
 // simulation.h  –  Traffic Simulation class declaration
-// Phase 3
+// Phase 3 + Phase 5 (Incidents, Dynamic Rerouting, Sensor Ingestion, Alerts)
 // =============================================================================
 #pragma once
 
@@ -8,10 +8,14 @@
 #include "vehicle.h"
 #include "vehicle_queue.h"
 #include "minheap.h"
+#include "incidents.h"
+#include "sensor_feed.h"
+#include "alerts.h"
 
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <utility>
 
 // =============================================================================
 // Simulation
@@ -29,10 +33,22 @@ class Simulation {
 public:
     // ── Configuration ─────────────────────────────────────────────────────────
     struct Config {
-        double green_duration = 2.0;  // minutes each outgoing direction is green
-                                      // (0.0 = signals disabled, always green)
-        double headway        = 0.1;  // min gap between consecutive entries onto edge
-        int    log_vehicle_id = 0;    // which vehicle's timeline to print (-1 = none)
+        double green_duration   = 2.0;  // minutes each outgoing direction is green
+                                        // (0.0 = signals disabled, always green)
+        double headway          = 0.1;  // min gap between consecutive entries onto edge
+        int    log_vehicle_id   = 0;    // which vehicle's timeline to print (-1 = none)
+        bool   enable_rerouting = true; // Phase 5 dynamic rerouting toggle
+        double reroute_threshold = 0.10;// 10% faster required to trigger proactive reroute
+        bool   enable_sensor_feed = false; // Phase 5 sensor feed integration
+        double sensor_interval  = 1.0;  // 1-minute sensor sampling interval
+    };
+
+    struct RunMetrics {
+        int    completed       = 0;
+        int    failed          = 0;
+        double avg_travel_time = 0.0;
+        double max_travel_time = 0.0;
+        double total_wait      = 0.0;
     };
 
     explicit Simulation(Graph& g);
@@ -41,17 +57,43 @@ public:
     // Add one vehicle.  Route is computed with A* using current edge flows.
     void add_vehicle(int src, int dst, double spawn_time);
 
+    // Schedule an incident in the simulation event heap.
+    void add_incident(const Incident& inc);
+
+    // Ingest a sensor reading
+    void add_sensor_reading(const SensorReading& r);
+
+    // Ingest sensor readings from CSV
+    int  load_sensor_csv(const std::string& filepath);
+
     // Run until max_time (minutes) or until all events are processed.
     void run(double max_time = 300.0);
 
     // Print end-of-run summary: completed count, avg time, avg wait, top edges.
     void print_summary() const;
 
+    // Aggregated run metrics (completed, failed, avg time, max time, wait)
+    RunMetrics get_metrics() const;
+
     // Print timestamped timeline for vehicle `vid`.
     void print_vehicle_timeline(int vid) const;
 
     // Read-only access to vehicle list (for unit tests)
     const std::vector<Vehicle>& get_vehicles() const { return vehicles_; }
+
+    // Access to AlertManager
+    const AlertManager& get_alert_manager() const { return alerts_; }
+    AlertManager& get_alert_manager() { return alerts_; }
+
+    // Access to IncidentManager
+    const IncidentManager& get_incident_manager() const { return incidents_; }
+
+    // Access to SensorFeed
+    const SensorFeed& get_sensor_feed() const { return sensor_feed_; }
+    SensorFeed& get_sensor_feed() { return sensor_feed_; }
+
+    // Edge entry records: key -> list of (vehicle_id, entry_time)
+    const std::vector<std::pair<int, double>>& get_edge_entries(int from, int to) const;
 
 private:
     Graph&  g_;
@@ -60,11 +102,14 @@ private:
     std::vector<Vehicle> vehicles_;
 
     // Per-edge queues (vehicles waiting to enter).
-    // Key: from * 100 + to   (safe for ≤ 99 node IDs)
+    // Key: from * 1000 + to
     std::unordered_map<int, VehicleQueue<int>> queues_;
 
     // Number of vehicles currently ON each directed edge (traversing).
     std::unordered_map<int, int> edge_active_;
+
+    // Recorded entries onto each edge: key -> [(vid, timestamp)]
+    std::unordered_map<int, std::vector<std::pair<int, double>>> edge_entries_;
 
     // Per-edge stats recorded throughout the run.
     struct EdgeStat {
@@ -86,8 +131,14 @@ private:
     // Time each vehicle joined the current edge queue (for wait accounting).
     std::unordered_map<int, double> veh_join_time_;
 
+    // Managers for Incidents, Alerts, and Sensors
+    IncidentManager incidents_;
+    AlertManager    alerts_;
+    SensorFeed      sensor_feed_;
+    std::vector<Incident> scheduled_incidents_;
+
     // ── Helpers ───────────────────────────────────────────────────────────────
-    int    edge_key(int from, int to) const { return from * 100 + to; }
+    int    edge_key(int from, int to) const { return from * 1000 + to; }
 
     // Index of edge (from→to) in adj[from].  -1 if not found.
     int    get_edge_index(int from, int to) const;
@@ -117,4 +168,8 @@ private:
     void on_enters_edge    (const EventData& e, double t);
     void on_exits_edge     (const EventData& e, double t);
     void on_signal_check   (const EventData& e, double t);
+    void on_incident_start (const EventData& e, double t);
+    void on_incident_end   (const EventData& e, double t);
+    void on_sensor_reading (const EventData& e, double t);
+    void on_timeseries_tick(double t);
 };

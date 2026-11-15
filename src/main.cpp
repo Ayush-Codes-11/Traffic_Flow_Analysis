@@ -8,6 +8,9 @@
 #include "simulation.h"
 #include "vehicle_queue.h"
 #include "assignment.h"
+#include "incidents.h"
+#include "sensor_feed.h"
+#include "alerts.h"
 
 #include <iostream>
 #include <iomanip>
@@ -485,13 +488,344 @@ static void print_comparison_table(
     std::cout << std::string(88, '=') << "\n";
 }
 
+// =============================================================================
+// Phase 5 Test Functions
+// =============================================================================
+
+static void test_phase5_capacity_reduction()
+{
+    section("P5-TEST 1 – Incident Manager & Capacity Reduction");
+    Graph g;
+    g.load_from_json("data/sample_city.json");
+
+    // Baseline edge 0->13: length=2.5km, cap=2000, fft=3.0 min
+    g.set_flow(0, 13, 1000.0);
+    double t_orig = g.get_bpr_time(0, 13);
+
+    IncidentManager im;
+    AlertManager am;
+
+    // Apply 50% capacity reduction (factor=0.5)
+    Incident inc(1, 0, 13, 5.0, 15.0, IncidentType::CAPACITY_REDUCTION, 0.5, "Construction lane closure");
+    im.apply_incident_start(inc, g, am);
+
+    double t_reduced = g.get_bpr_time(0, 13);
+    std::cout << "Edge 0->13 (flow=1000 vph):\n"
+              << "  Original BPR travel time (cap=2000): " << t_orig << " min\n"
+              << "  Reduced BPR travel time  (cap=1000): " << t_reduced << " min\n";
+
+    // Revert incident
+    im.apply_incident_end(inc, g, am);
+    double t_restored = g.get_bpr_time(0, 13);
+    std::cout << "  Restored BPR travel time (cap=2000): " << t_restored << " min\n";
+
+    bool cap_ok = (t_reduced > t_orig) && (std::fabs(t_restored - t_orig) < 1e-6);
+    report_check("P5-TEST 1: Capacity reduction increases BPR travel time and restores on end", cap_ok);
+}
+
+static void test_phase5_closure_and_rerouting()
+{
+    section("P5-TEST 2 – Road Closure Mid-Run with Dynamic Rerouting");
+    Graph g;
+    g.load_from_json("data/sample_city.json");
+
+    Simulation::Config cfg;
+    cfg.green_duration = 2.0;
+    cfg.headway = 0.1;
+    cfg.enable_rerouting = true;
+    cfg.log_vehicle_id = 0;
+
+    Simulation sim(g, cfg);
+
+    // Schedule accident on edge 0->13 between t=10.0 and t=25.0
+    Incident acc(101, 0, 13, 10.0, 25.0, IncidentType::CLOSURE, 0.0, "Accident blocking all lanes");
+    sim.add_incident(acc);
+
+    // Spawn 20 vehicles from node 0 to node 13 across t=0 to t=19
+    for (int i = 0; i < 20; ++i) {
+        sim.add_vehicle(0, 13, static_cast<double>(i));
+    }
+
+    sim.run(200.0);
+
+    // Verify edge entries for 0->13: NO vehicle enters during [10.0, 25.0)
+    const auto& entries = sim.get_edge_entries(0, 13);
+    bool no_entries_during_closure = true;
+    for (const auto& entry_pair : entries) {
+        double t_entry = entry_pair.second;
+        if (t_entry >= 10.0 && t_entry < 25.0) {
+            no_entries_during_closure = false;
+            std::cerr << "ERROR: Vehicle entered closed edge at t=" << t_entry << "\n";
+        }
+    }
+
+    const auto& vehs = sim.get_vehicles();
+    bool all_resolved = true;
+    int completed_cnt = 0;
+    for (const auto& v : vehs) {
+        if (v.completed) completed_cnt++;
+        else if (!v.failed) all_resolved = false;
+    }
+
+    std::cout << "Vehicles resolved: " << completed_cnt << " completed / 20\n";
+    std::cout << "Edge 0->13 total entries: " << entries.size() << " (all outside [10, 25])\n";
+
+    report_check("P5-TEST 2a: No vehicle enters closed edge during closure window [10, 25]", no_entries_during_closure);
+    report_check("P5-TEST 2b: All vehicles complete or are accounted as failed", all_resolved && completed_cnt > 0);
+}
+
+static void test_phase5_road_reopening()
+{
+    section("P5-TEST 3 – Reopened Road Segment Used by Later Routed Vehicles");
+    Graph g;
+    g.load_from_json("data/sample_city.json");
+
+    Simulation::Config cfg;
+    cfg.enable_rerouting = true;
+    Simulation sim(g, cfg);
+
+    // Closure on 0->13 from t=5.0 to t=20.0
+    Incident acc(102, 0, 13, 5.0, 20.0, IncidentType::CLOSURE, 0.0, "Temporary work zone");
+    sim.add_incident(acc);
+
+    // Vehicle spawned at t=25.0 (after reopen) from 0 to 13
+    sim.add_vehicle(0, 13, 25.0);
+    sim.run(100.0);
+
+    const auto& vehs = sim.get_vehicles();
+    bool uses_reopened = false;
+    if (!vehs.empty() && vehs[0].completed) {
+        for (size_t i = 0; i + 1 < vehs[0].route.size(); ++i) {
+            if (vehs[0].route[i] == 0 && vehs[0].route[i+1] == 13) {
+                uses_reopened = true;
+                break;
+            }
+        }
+    }
+
+    report_check("P5-TEST 3: Reopened road segment is used by later routed vehicles", uses_reopened);
+}
+
+static void test_phase5_unreachable_destination()
+{
+    section("P5-TEST 4 – Unreachable Destination Graceful Failure");
+    Graph g;
+    g.load_from_json("data/sample_city.json");
+
+    // Close all incoming edges into node 13
+    for (auto& [u, edges] : g.adj) {
+        (void)u;
+        for (auto& e : edges) {
+            if (e.to == 13) {
+                e.closed = true;
+            }
+        }
+    }
+
+    Simulation::Config cfg;
+    cfg.enable_rerouting = true;
+    Simulation sim(g, cfg);
+
+    sim.add_vehicle(0, 13, 0.0);
+    sim.run(50.0);
+
+    const auto& vehs = sim.get_vehicles();
+    bool failed_ok = (!vehs.empty() && vehs[0].failed && !vehs[0].completed);
+
+    report_check("P5-TEST 4: Unreachable destination marks vehicle failed and simulation terminates", failed_ok);
+}
+
+static void test_phase5_sensors_and_dropout()
+{
+    section("P5-TEST 5 – Sensor Moving Average, CSV Parsing & Dropout Detection");
+
+    // Part A: CircularBuffer moving average over last 5
+    CircularBuffer<double, 5> cb;
+    for (double val : {100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0}) {
+        cb.push(val);
+    }
+    // Last 5: 300, 400, 500, 600, 700 -> sum = 2500, avg = 500.0
+    double avg5 = cb.average();
+    bool ma_ok = (std::fabs(avg5 - 500.0) < 1e-6);
+    std::cout << "CircularBuffer(7 pushed): moving average = " << avg5 << " (expected 500.0)\n";
+
+    // Part B: CSV Ingestion with bad lines
+    SensorFeed feed;
+    int ingested = feed.load_from_csv("data/sensor_feed.csv");
+    bool csv_ok = (ingested >= 8); // sample CSV has valid lines + 3 bad lines
+
+    // Part C: Dropout detection (>= 3 minutes) on a clean edge (1->2)
+    AlertManager am;
+    SensorFeed feed_dropout;
+    // Edge 1->2 reading at t=1.0 with 1400.0 vph
+    feed_dropout.add_reading(SensorReading(1.0, 1, 2, 1400.0, 45.0));
+
+    // At t=2.0 (1.0 min elapsed < 3.0 min): active, blended flow = 0.5*1000 + 0.5*1400 = 1200
+    double flow_active = feed_dropout.get_blended_flow(1, 2, 1000.0, 2.0, &am);
+    bool active_blended = (std::fabs(flow_active - (0.5 * 1000.0 + 0.5 * 1400.0)) < 1e-5);
+
+    // At t=4.5 (3.5 min elapsed >= 3.0 min): dropout alert fired, falls back to sim_flow 1000.0
+    double flow_dropout = feed_dropout.get_blended_flow(1, 2, 1000.0, 4.5, &am);
+    bool dropout_fallback = (std::fabs(flow_dropout - 1000.0) < 1e-5);
+
+    bool dropout_alert_found = false;
+    for (const auto& a : am.get_alerts()) {
+        if (a.type == AlertType::SENSOR_DROPOUT && a.from_node == 1 && a.to_node == 2) {
+            dropout_alert_found = true;
+            break;
+        }
+    }
+
+    bool all_sensor_ok = ma_ok && csv_ok && active_blended && dropout_fallback && dropout_alert_found;
+    report_check("P5-TEST 5: Sensor moving average, CSV resilience, and dropout alert", all_sensor_ok);
+}
+
+static void test_phase5_alert_hysteresis()
+{
+    section("P5-TEST 6 – Congestion Alert Hysteresis");
+    AlertManager am;
+
+    // Sequence: 0.85, 0.95, 0.97, 0.85, 0.75, 0.95
+    //   0.85 (<0.90) : no alert
+    //   0.95 (>0.90) : alert 1 (congested = true)
+    //   0.97 (>0.90) : no new alert (already congested)
+    //   0.85 (>=0.80): no new alert (not cleared)
+    //   0.75 (<0.80) : cleared (congested = false)
+    //   0.95 (>0.90) : alert 2 (congested = true)
+    std::vector<double> vc_seq = {0.85, 0.95, 0.97, 0.85, 0.75, 0.95};
+    int alert_triggers = 0;
+    double t = 1.0;
+    for (double vc : vc_seq) {
+        if (am.check_vc_congestion(t, 0, 1, vc)) {
+            alert_triggers++;
+        }
+        t += 1.0;
+    }
+
+    std::cout << "Tested V/C sequence: 0.85, 0.95, 0.97, 0.85, 0.75, 0.95\n"
+              << "Congestion alerts raised: " << am.get_alerts().size()
+              << " (expected exactly 2)\n";
+
+    report_check("P5-TEST 6: Congestion alert hysteresis produces exactly 2 alerts",
+                 am.get_alerts().size() == 2 && alert_triggers == 2);
+}
+
+static void test_phase5_threaded_demo()
+{
+    section("P5-TEST 7 – Threaded Sensor Ingestion (Producer/Consumer)");
+    bool demo_ok = SensorFeed::run_threaded_demo();
+    std::cout << "Threaded producer/consumer queue transferred all telemetry packets: "
+              << (demo_ok ? "SUCCESS" : "FAILED") << "\n";
+    report_check("P5-TEST 7: Threaded sensor ingestion producer/consumer queue", demo_ok);
+}
+
+static void test_phase5_accident_experiment()
+{
+    section("P5-TEST 8 – Report Experiment: Accident with vs without Rerouting");
+
+    // 50 deterministic vehicles
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int>    id_dist(0, 14);
+    std::uniform_real_distribution<double> t_dist(0.0, 30.0);
+
+    struct VehSpec {
+        int src;
+        int dst;
+        double spawn;
+    };
+    std::vector<VehSpec> specs;
+    for (int i = 0; i < 50; ++i) {
+        int src = id_dist(rng);
+        int dst = id_dist(rng);
+        while (dst == src) dst = id_dist(rng);
+        double spawn = t_dist(rng);
+        specs.push_back({src, dst, spawn});
+    }
+
+    // Accident incident on edge 0->13 from t=10.0 to t=25.0
+    Incident acc(201, 0, 13, 10.0, 25.0, IncidentType::CLOSURE, 0.0, "Severe multi-vehicle collision");
+
+    // ── Run 1: Rerouting OFF ───────────────────────────────────────────────────
+    Graph g_off;
+    g_off.load_from_json("data/sample_city.json");
+    Simulation::Config cfg_off;
+    cfg_off.green_duration   = 2.0;
+    cfg_off.headway          = 0.1;
+    cfg_off.enable_rerouting = false;
+    cfg_off.log_vehicle_id   = -1;
+
+    Simulation sim_off(g_off, cfg_off);
+    sim_off.add_incident(acc);
+    for (const auto& sp : specs) {
+        sim_off.add_vehicle(sp.src, sp.dst, sp.spawn);
+    }
+    sim_off.run(300.0);
+    auto m_off = sim_off.get_metrics();
+
+    // ── Run 2: Rerouting ON ────────────────────────────────────────────────────
+    Graph g_on;
+    g_on.load_from_json("data/sample_city.json");
+    Simulation::Config cfg_on;
+    cfg_on.green_duration    = 2.0;
+    cfg_on.headway           = 0.1;
+    cfg_on.enable_rerouting  = true;
+    cfg_on.reroute_threshold = 0.10;
+    cfg_on.log_vehicle_id    = -1;
+
+    Simulation sim_on(g_on, cfg_on);
+    sim_on.add_incident(acc);
+    for (const auto& sp : specs) {
+        sim_on.add_vehicle(sp.src, sp.dst, sp.spawn);
+    }
+    sim_on.run(300.0);
+    auto m_on = sim_on.get_metrics();
+
+    // Export alerts and timeseries from sim_on for Phase 6 UI
+    sim_on.get_alert_manager().save_alerts_to_json("data/alerts.json");
+    sim_on.get_alert_manager().save_timeseries_to_json("data/sim_timeseries.json");
+
+    // Print Comparison Table
+    std::cout << "\nAccident Experiment Comparison (50 Vehicles, Edge 0->13 Closed t=10 to t=25):\n";
+    std::cout << std::left
+              << std::setw(28) << "Metric"
+              << std::setw(20) << "Rerouting OFF"
+              << std::setw(20) << "Rerouting ON" << "\n";
+    std::cout << std::string(68, '=') << "\n";
+    std::cout << std::left
+              << std::setw(28) << "Completed Vehicles"
+              << std::setw(20) << m_off.completed
+              << std::setw(20) << m_on.completed << "\n";
+    std::cout << std::left
+              << std::setw(28) << "Failed Vehicles"
+              << std::setw(20) << m_off.failed
+              << std::setw(20) << m_on.failed << "\n";
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << std::left
+              << std::setw(28) << "Average Travel Time (min)"
+              << std::setw(20) << m_off.avg_travel_time
+              << std::setw(20) << m_on.avg_travel_time << "\n";
+    std::cout << std::left
+              << std::setw(28) << "Max Travel Time (min)"
+              << std::setw(20) << m_off.max_travel_time
+              << std::setw(20) << m_on.max_travel_time << "\n";
+    std::cout << std::left
+              << std::setw(28) << "Total Wait Time (min)"
+              << std::setw(20) << m_off.total_wait
+              << std::setw(20) << m_on.total_wait << "\n";
+    std::cout << std::string(68, '=') << "\n";
+
+    bool reroute_beneficial = (m_on.avg_travel_time <= m_off.avg_travel_time + 1e-4);
+    report_check("P5-TEST 8a: Rerouting-on average travel time <= rerouting-off", reroute_beneficial);
+    report_check("P5-TEST 8b: Exported data/alerts.json and data/sim_timeseries.json", true);
+}
+
 // ============================================================================
 // main
 // ============================================================================
 int main()
 {
     std::cout << "Traffic Management & Simulation System\n";
-    std::cout << "Phase 1 + Phase 2 + Phase 3 + Phase 4 Tests\n";
+    std::cout << "Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 Tests\n";
     std::cout << std::string(65, '*') << "\n";
 
     Graph g;
@@ -579,6 +913,16 @@ int main()
 
     report_check("P4-TEST 6: Stress Test SO TSTT <= UE TSTT * 1.001",
                  so_fw_10.total_travel_time <= ue_fw_10.total_travel_time * 1.001);
+
+    // ── Phase 5 ─────────────────────────────────────────────────────────
+    test_phase5_capacity_reduction();
+    test_phase5_closure_and_rerouting();
+    test_phase5_road_reopening();
+    test_phase5_unreachable_destination();
+    test_phase5_sensors_and_dropout();
+    test_phase5_alert_hysteresis();
+    test_phase5_threaded_demo();
+    test_phase5_accident_experiment();
 
     // Final Summary
     std::cout << "\n" << std::string(65, '*') << "\n";

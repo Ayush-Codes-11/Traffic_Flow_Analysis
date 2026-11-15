@@ -343,6 +343,39 @@ bool Graph::set_closed(int from, int to, bool closed)
     return false;
 }
 
+// set_capacity
+// ------------
+// Set capacity for a directed edge (used for capacity reduction incidents).
+// Time: O(out-degree of 'from')
+bool Graph::set_capacity(int from, int to, double new_capacity)
+{
+    auto it = adj.find(from);
+    if (it == adj.end()) return false;
+    for (auto& e : it->second) {
+        if (e.to == to) {
+            e.capacity = new_capacity;
+            return true;
+        }
+    }
+    return false;
+}
+
+// get_capacity
+// ------------
+// Get capacity for a directed edge.
+// Time: O(out-degree of 'from')
+double Graph::get_capacity(int from, int to) const
+{
+    auto it = adj.find(from);
+    if (it == adj.end()) return -1.0;
+    for (const auto& e : it->second) {
+        if (e.to == to) {
+            return e.capacity;
+        }
+    }
+    return -1.0;
+}
+
 // edge_count
 // ----------
 // Count total directed edges across all adjacency lists.

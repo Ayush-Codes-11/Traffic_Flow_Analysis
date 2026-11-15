@@ -16,7 +16,10 @@ jobs:
 
       - name: Compile C++ project
         run: |
-          g++ -std=c++17 -O2 -Wall -Wextra -o traffic_sim src/graph.cpp src/dijkstra.cpp src/astar.cpp src/simulation.cpp src/assignment.cpp src/main.cpp
+          g++ -std=c++17 -O2 -Wall -Wextra -pthread -o traffic_sim \
+            src/graph.cpp src/dijkstra.cpp src/astar.cpp src/simulation.cpp \
+            src/assignment.cpp src/alerts.cpp src/incidents.cpp \
+            src/sensor_feed.cpp src/main.cpp
 
       - name: Run C++ test suite
         run: |
@@ -29,3 +32,14 @@ jobs:
           echo "=========================================="
           tail -n 40 output.log
           exit $EXIT_CODE
+
+      - name: Upload simulation and assignment data artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traffic-simulation-artifacts
+          path: |
+            data/assignment_result.json
+            data/alerts.json
+            data/sim_timeseries.json
+          if-no-files-found: warn

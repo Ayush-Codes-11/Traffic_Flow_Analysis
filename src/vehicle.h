@@ -24,10 +24,13 @@ struct Vehicle {
     double finish_time;   // time it reached dst  (-1.0 until completed)
     double total_wait;    // accumulated signal/queue wait time (minutes)
     bool   completed;
+    bool   failed;        // true if route could not be found (unreachable dst)
+    std::string failure_reason;
 
     Vehicle()
         : id(-1), src(-1), dst(-1), route_pos(0),
-          entry_time(0), finish_time(-1.0), total_wait(0.0), completed(false) {}
+          entry_time(0), finish_time(-1.0), total_wait(0.0), completed(false),
+          failed(false), failure_reason("") {}
 };
 
 // =============================================================================
@@ -39,16 +42,26 @@ enum class EventType {
     VEHICLE_ENTERS_EDGE,      // vehicle dequeued + begins traversal
     VEHICLE_EXITS_EDGE,       // vehicle finishes traversal, reaches downstream node
     SIGNAL_CHECK,             // a red signal has cycled to green; wake waiting vehicles
+    INCIDENT_START,           // an incident begins (closure or capacity reduction)
+    INCIDENT_END,             // an incident ends (restoration of edge)
+    SENSOR_READING,           // a periodic or external sensor reading arrives
+    SIM_TIMESERIES_TICK       // 1-minute sampling interval for timeseries export
 };
 
 // =============================================================================
 // EventData
 // Payload stored alongside the event timestamp in the MinHeap.
-// vehicle_id == -1 for SIGNAL_CHECK events (they don't belong to one vehicle).
+// vehicle_id == -1 for SIGNAL_CHECK, INCIDENT_*, SENSOR_* events.
 // =============================================================================
 struct EventData {
     EventType type;
-    int vehicle_id;   // -1 for SIGNAL_CHECK / cascade ENTERS events
+    int vehicle_id;   // -1 for non-vehicle events
     int from_node;
     int to_node;
+    int incident_id;  // ID of incident for INCIDENT_START / INCIDENT_END
+    double sensor_val;// flow reading or speed value for sensor events
+
+    EventData()
+        : type(EventType::SIGNAL_CHECK), vehicle_id(-1), from_node(-1),
+          to_node(-1), incident_id(-1), sensor_val(0.0) {}
 };
